@@ -1,7 +1,7 @@
 // Fin Fury service worker: keeps the game playable offline once it has been opened (or installed) online.
 // The page itself is fetched fresh whenever there is a connection, so updates arrive on the next launch.
 // Bump CACHE when the list of core files changes.
-const CACHE = 'fin-fury-v1';
+const CACHE = 'fin-fury-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

@@ -56,6 +56,8 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
 .keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:.9rem;color:var(--mist);align-items:center}
 .beasts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .beasts li{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:center;background:rgba(255,255,255,.03);border-radius:12px;padding:4px 10px 4px 4px}
+.beasts li.zonehead{display:block;background:none;padding:10px 4px 2px}
+.beasts li.zonehead b{color:var(--gold-2);font-size:1.05rem}
 .beasts canvas{width:96px;height:52px}
 .beasts b{font-family:var(--d);font-size:.95rem;color:var(--foam)}
 .beasts span{display:block;font-size:.8rem;color:var(--dim);font-variant-numeric:tabular-nums}
@@ -189,7 +191,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
       <div class="stack">
         <h3>What swims here</h3>
         <ul id="beasts" class="beasts"></ul>
-        <p class="small">Weakest and most common at the top. Nothing attacks until you swim too close or shoot it. Only jellyfish and crabs are slower than you, and about one creature in ten carries a handgun or rifle. Shooting a whale makes it angry.</p>
+        <p class="small">Weakest and most common at the top. Nothing attacks until you swim too close or shoot it. Only jellyfish, crabs and deep jellyfish are slower than you, and about one creature in ten carries a gun. Shooting a whale makes it angry.</p>
       </div>
     </div>
   </div>
@@ -282,8 +284,16 @@ function circ(x,y,r){cx.beginPath();cx.arc(x,y,Math.max(.1,r),0,TAU)}
 function rr(x,y,w,h,r){cx.beginPath();cx.roundRect(x,y,w,h,r)}
 
 // ===================================================================== world
-const WW=9000,TOP=170,FL=3600;
-function floorY(x){return FL-70*Math.sin(x*.0011+.6)-40*Math.sin(x*.0037+1.3)-16*Math.sin(x*.0113+.4)}
+// Two zones side by side. The Sunlit Zone (0) is where every run starts; the Twilight Zone (1) lies past
+// the Sunlit Zone's east wall and is twice as deep. `zone` is where this page's own fish is.
+const WW=9000;
+const ZONES=[{name:'The Sunlit Zone',sub:'0 to 200 metres · where the light reaches',top:170,fl:3600},
+  {name:'The Twilight Zone',sub:'200 to 1,000 metres · where sunlight fades out',top:300,fl:7200}];
+const ZT=z=>ZONES[z].top,ZF=z=>ZONES[z].fl;
+let zone=0;
+function floorY(x,z=zone){
+  if(z===1)return 7200-180*Math.sin(x*.0008+2)-90*Math.sin(x*.0027+.7)-35*Math.sin(x*.009+1.1);
+  return 3600-70*Math.sin(x*.0011+.6)-40*Math.sin(x*.0037+1.3)-16*Math.sin(x*.0113+.4)}
 function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const DEC={rocks:[],kelp:[],coral:[],far:[],mid:[],snow:[]};
 (function genDecor(){
@@ -297,9 +307,24 @@ const DEC={rocks:[],kelp:[],coral:[],far:[],mid:[],snow:[]};
   for(let i=0;i<90;i++)DEC.snow.push({x:r(),y:r(),z:.3+r()*.7,ph:r()*TAU});
   DEC.rocks.sort((a,b)=>a.x-b.x);
 })();
+// Twilight Zone dressing: dark rock, hydrothermal vents, tube worms, glowing anemones and drifting lights
+const DEC1={rocks:[],vents:[],tubes:[],glow:[],far:[],mid:[],lights:[]};
+(function genDecor1(){
+  const r=mulberry(11);
+  for(let i=0;i<95;i++){const x=r()*WW,s=36+r()*120,n=9,pts=[];for(let k=0;k<n;k++){const a=Math.PI+k/(n-1)*Math.PI;pts.push([Math.cos(a)*s*(1.05+r()*.45),Math.sin(a)*s*(.6+r()*.7)])}
+    DEC1.rocks.push({x,s,pts,c:['#2c3140','#262b38','#33293d','#242a33'][(r()*4)|0]})}
+  for(let i=0;i<24;i++)DEC1.vents.push({x:200+r()*(WW-400),h:70+r()*130,w:34+r()*26,ph:r()*TAU});
+  for(let i=0;i<70;i++)DEC1.tubes.push({x:r()*WW,n:3+((r()*5)|0),h:30+r()*50,ph:r()*TAU});
+  for(let i=0;i<140;i++)DEC1.glow.push({x:r()*WW,h:12+r()*40,c:['#7ff7ff','#9a7dff','#5dffb0','#ff7ad9'][(r()*4)|0],ph:r()*TAU});
+  for(let i=0;i<60;i++)DEC1.far.push({x:r()*WW*.5-400,w:120+r()*300,h:300+r()*1100});
+  for(let i=0;i<70;i++)DEC1.mid.push({x:r()*WW*.75-300,w:60+r()*200,h:200+r()*700});
+  for(let i=0;i<220;i++)DEC1.lights.push({x:r()*WW,y:400+r()*6600,c:['#7ff7ff','#9a7dff','#5dffb0','#ff7ad9','#7fb8ff'][(r()*5)|0],ph:r()*TAU,s:1.5+r()*2.5});
+})();
 
 // ===================================================================== species, parts and guns
-const ORDER=['jelly','crab','turtle','sword','shark','orca','whale'];
+// ORDER lists every species, Sunlit first; ZSP splits them by zone (weakest and most common first in each)
+const ZSP=[['jelly','crab','turtle','sword','shark','orca','whale'],['djelly','bristle','viper','swallow','squid','sperm']];
+const ORDER=[...ZSP[0],...ZSP[1]];
 const STS=['wander','chase','windup','lunge','recover'];
 // C: hit circles [x along facing, y, radius] that match the drawn sprite. L: lunge {range, windup, speed, time, cooldown}
 // gm: where an armed creature holds its gun [x, y, scale]. The player swims at 285, so everything past the crab chases faster than that.
@@ -320,29 +345,58 @@ const SP={
   whale:{name:'Whale',part:'Baleen',hp:1300,dmg:100,w:1.3,g:[1,1],spd:50,chase:300,turn:1.6,detect:360,fm:120,top:90,bw:240,tiltMax:.22,
     C:[[-185,0,24],[-140,0,42],[-80,0,62],[-10,0,72],[70,0,70],[140,6,56],[190,10,34]],L:{r:420,w:.8,s:480,t:.9,c:1.4},
     rage:{chase:380,turn:2.4,L:{r:580,w:.4,s:780,t:.8,c:.55}},gm:[80,50,2.4],drop:[1,2],rar:'Legendary',col:'#4f6f90'},
+  // ---- the Twilight Zone: everything is tougher, and only the deep jellyfish is slower than you
+  djelly:{name:'Deep Jellyfish',part:'Glow Bell',hp:140,dmg:18,w:40,g:[2,5],spd:25,chase:95,turn:1.3,detect:170,fm:60,top:44,bw:60,tiltMax:0,
+    C:[[0,-8,25],[0,24,12]],gm:[0,26,1],drop:[1,1],rar:'Swarms',col:'#5a4fd0'},
+  bristle:{name:'Bristlemouth',part:'Glow Scale',hp:80,dmg:14,w:30,g:[4,8],spd:120,chase:330,turn:3,detect:260,fm:40,top:16,bw:36,tiltMax:.5,lw:2.4,
+    C:[[-10,0,7],[4,0,9],[15,1,6]],L:{r:140,w:.3,s:620,t:.3,c:.9},gm:[2,8,.7],drop:[1,1],rar:'Schools',col:'#8c96a8'},
+  viper:{name:'Viperfish',part:'Viper Fang',hp:360,dmg:34,w:16,g:[1,2],spd:100,chase:360,turn:2.6,detect:380,fm:50,top:46,bw:90,tiltMax:.45,
+    C:[[-45,0,9],[-20,0,12],[6,0,13],[30,1,12],[50,3,10]],L:{r:300,w:.45,s:820,t:.35,c:1},gm:[6,14,1.1],drop:[1,2],rar:'Common',col:'#3e5f82'},
+  swallow:{name:'Swallower',part:'Swallower Gut',hp:650,dmg:48,w:9,g:[1,2],spd:70,chase:340,turn:2.2,detect:360,fm:70,top:40,bw:110,tiltMax:.4,
+    C:[[-48,0,9],[-24,0,12],[6,16,34],[38,4,14],[56,6,9]],L:{r:260,w:.6,s:700,t:.45,c:1.1},gm:[10,40,1.3],drop:[1,2],rar:'Uncommon',col:'#d8c3bb'},
+  squid:{name:'Giant Squid',part:'Squid Beak',hp:1700,dmg:70,w:4,g:[1,1],spd:90,chase:360,turn:1.8,detect:420,fm:90,top:50,bw:180,tiltMax:.35,
+    C:[[160,0,16],[120,0,28],[75,0,36],[30,0,30],[2,0,20],[-50,0,16],[-100,0,12]],L:{r:420,w:.6,s:760,t:.6,c:1.3},gm:[10,24,1.8],drop:[1,2],rar:'Rare',col:'#b0413e'},
+  // the sperm whale enrages when shot, like the whale above it
+  sperm:{name:'Sperm Whale',part:'Ambergris',hp:3800,dmg:130,w:1.4,g:[1,1],spd:55,chase:330,turn:1.5,detect:400,fm:140,top:90,bw:280,tiltMax:.2,lw:4,
+    C:[[-215,0,22],[-160,0,36],[-90,-4,52],[-10,-8,64],[80,-12,66],[170,-14,64],[222,-14,42]],L:{r:460,w:.8,s:540,t:.9,c:1.4},
+    rage:{chase:400,turn:2.2,L:{r:620,w:.4,s:860,t:.8,c:.55}},gm:[120,64,2.8],drop:[1,2],rar:'Legendary',col:'#4a4f5a'},
 };
+// per-species flags: which zone it lives in and its rank there; `roll` turns the whole body toward the player;
+// `jel` drifts in pulses and stings on contact instead of lunging
+ZSP.forEach((l,z)=>l.forEach((t,i)=>{SP[t].z=z;SP[t].rank=i}));
+for(const t of['jelly','crab','djelly'])SP[t].roll=true;
+for(const t of['jelly','djelly'])SP[t].jel=true;
+const NAMES_PL={jelly:'jellyfish',crab:'crabs',turtle:'sea turtles',sword:'swordfish',shark:'sharks',orca:'orcas',whale:'whales',
+  djelly:'deep jellyfish',bristle:'bristlemouths',viper:'viperfish',swallow:'swallowers',squid:'giant squid',sperm:'sperm whales'};
 // every lunge hits harder: 1.5x the dash speed over a slightly shorter burst, and a hit throws the fish (see LUNGE_KB)
 const LUNGE_SPEED=1.5,LUNGE_TIME=.8,LUNGE_KB=650;
 // Difficulty: Normal is the base game. Frenzy raises big-hunter numbers, creature health and attack,
 // gun odds and gun fire rate by 30%; Insanity adds another 30% on top (1.3 x 1.3).
 const DIFFS=[{n:'Normal',d:'The ocean as it is.'},
-  {n:'Frenzy',d:'30% more swordfish, sharks, orcas and whales. Creatures have 30% more health and hit 30% harder, and guns are 30% more common and fire 30% faster.'},
+  {n:'Frenzy',d:'30% more big hunters (swordfish, sharks, orcas, whales and their Twilight Zone cousins). Creatures have 30% more health and hit 30% harder, and guns are 30% more common and fire 30% faster.'},
   {n:'Insanity',d:'Another 30% on top of Frenzy for all of it: more big hunters, tougher, harder-hitting, and better armed.'}];
-const BIG=new Set(['sword','shark','orca','whale']);
+const BIG=new Set(['sword','shark','orca','whale','viper','swallow','squid','sperm']);
 let diff=0,selDiff=0;try{selDiff=diff=clamp(parseInt(localStorage.getItem('finfury-diff')||'0',10)||0,0,2)}catch(e){}
 const DM=()=>Math.pow(1.3,diff);
 // Guns Galore stacks on any mode: every creature spawns armed (by species) and all bullets fly 3x faster
 let gg=false,selGG=false;try{selGG=gg=localStorage.getItem('finfury-gg')==='1'}catch(e){}
 const BS=()=>gg?3:1;
 for(const t of ORDER){const s=SP[t];for(const L of[s.L,s.rage&&s.rage.L])if(L){L.s*=LUNGE_SPEED;L.t*=LUNGE_TIME}}
-const PLURAL={jelly:'Stingers',crab:'Claws',turtle:'Shell Plates',sword:'Bills',shark:'Shark Teeth',orca:'Orca Fins',whale:'Baleen Plates'};
+const PLURAL={jelly:'Stingers',crab:'Claws',turtle:'Shell Plates',sword:'Bills',shark:'Shark Teeth',orca:'Orca Fins',whale:'Baleen Plates',
+  djelly:'Glow Bells',bristle:'Glow Scales',viper:'Viper Fangs',swallow:'Swallower Guts',squid:'Squid Beaks',sperm:'Ambergris Lumps'};
 const partName=(t,n)=>n===1?SP[t].part:PLURAL[t];
 const GUNS=[
   {name:'Handgun',kind:'bullet',dmg:10,rate:3.2,speed:2100,range:620,spread:.035,ml:19,desc:'A steady pea-shooter. Fine for jellyfish and crabs.'},
   {name:'Rifle',kind:'bullet',dmg:12,rate:9,speed:2900,range:860,spread:.05,ml:41,cost:{jelly:8,crab:5,turtle:2},desc:'Fully automatic. Shreds turtles and swordfish.'},
   {name:'Bazooka',kind:'rocket',dmg:95,splash:55,radius:120,rate:1.25,speed:840,accel:2600,vmax:2300,range:1150,ml:35,cost:{turtle:5,sword:3,shark:3},desc:'Rockets that blast everything nearby. Brings down sharks and orcas.'},
-  {name:'Huge Red Laser',kind:'laser',dps:280,range:980,ml:46,cost:{shark:5,orca:3,whale:1},desc:'A continuous beam that cuts through every creature in its path.'},
+  {name:'Huge Red Laser',kind:'laser',dps:280,range:980,bw:6,ml:46,cost:{shark:5,orca:3,whale:1},desc:'A continuous beam that cuts through every creature in its path. It can also blast through cracked rock.'},
+  // ---- Twilight Zone guns, built from Twilight Zone parts
+  {name:'Bubble Blaster',kind:'bubble',dmg:16,pellets:14,spread:.36,rate:2.6,speed:1250,range:520,ml:40,cost:{djelly:8,bristle:8,viper:2},desc:'Sprays a roaring cone of bubbles. Each one stings, and up close the whole spray shreds.'},
+  {name:'Light Show',kind:'light',dmg:34,rate:13,speed:4200,range:1300,spread:.03,pierce:2,ml:46,cost:{viper:6,swallow:4,bristle:6},desc:'Long, fast streaks of coloured light. Each one cuts through two creatures before it fades.'},
+  {name:'Tooth Shooter',kind:'teeth',dmg:60,rate:3.5,speed:2600,range:1100,spread:.02,pierce:3,ml:44,cost:{swallow:5,squid:3,viper:4},desc:'Fires a whole row of five teeth at once. Each tooth bites through three creatures.'},
+  {name:'Mega Beam',kind:'laser',dps:1100,range:1400,bw:20,ml:61,cost:{squid:4,sperm:2,swallow:5},desc:'A wider, longer, far stronger laser that glows in your fish\'s own colour.'},
 ];
+const isLaser=t=>GUNS[t].kind==='laser';
 const COLORS=[{n:'Goldfish',c:'#f39a2b'},{n:'Crimson',c:'#e0473c'},{n:'Lemon',c:'#f2cf3a'},{n:'Lagoon',c:'#38b6d8'},{n:'Kelp',c:'#5fbf5a'},{n:'Violet',c:'#9a6be0'},{n:'Coral',c:'#f27aa6'},{n:'Pearl',c:'#e9e4d6'}];
 let selColor=0;try{selColor=clamp(parseInt(localStorage.getItem('finfury-color')||'0',10)||0,0,COLORS.length-1)}catch(e){}
 
@@ -358,6 +412,9 @@ function eyeDot(x,y,r,ag){
   const lw=cx.lineWidth;cx.lineWidth=Math.min(lw,2);circ(x,y,r);cx.fillStyle=ag?'#ff8a2a':INK;cx.fill();cx.stroke();cx.lineWidth=lw;
   circ(x-r*.3,y-r*.35,r*.36);cx.fillStyle='#fff';cx.fill();
 }
+// a soft additive glow, for bioluminescence
+function glow(x,y,r,col,a=.5){cx.save();cx.globalCompositeOperation='lighter';const g=cx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');
+  cx.globalAlpha*=a;cx.fillStyle=g;cx.beginPath();cx.arc(x,y,r,0,TAU);cx.fill();cx.restore()}
 
 // ===================================================================== drawing: creatures (local space, facing +x)
 const DRAW={
@@ -442,8 +499,88 @@ const DRAW={
     cx.save();cx.translate(96,40);cx.rotate(-.42+Math.sin(e.anim*1.6)*.12);cx.beginPath();cx.moveTo(0,-8);cx.quadraticCurveTo(-70,10,-150,8);cx.quadraticCurveTo(-70,24,4,12);cx.closePath();fs('#4b6a8a');cx.restore();
     eyeDot(176,12,5,ag);
   },
+  // ---- Twilight Zone
+  djelly(e,ag){
+    const p=Math.sin(e.anim*2.4+e.ph),w=27+p*3,h=23-p*2.5;
+    for(let i=-3;i<=3;i++){cx.beginPath();const x0=i*7;cx.moveTo(x0,2);
+      for(let k=1;k<=6;k++)cx.lineTo(x0+Math.sin(e.anim*3+k*.8+i)*4*k/3+i*k*.8,k*10+p*3);
+      cx.lineWidth=5;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=2.2;cx.strokeStyle=C('#8f9bff');cx.stroke()}
+    cx.lineWidth=3.2;cx.strokeStyle=INK;
+    cx.beginPath();cx.moveTo(-w,2);cx.bezierCurveTo(-w,-h*1.6,w,-h*1.6,w,2);cx.quadraticCurveTo(w*.5,-3+p,0,4);cx.quadraticCurveTo(-w*.5,-3+p,-w,2);cx.closePath();
+    cx.save();cx.globalAlpha*=.92;fs('#3b3192');cx.restore();
+    ell(0,-10,w*.6,h*.55);cx.fillStyle=C('#5a4fd0');cx.fill();
+    ell(-7,-17,8,3.5,-.3);cx.fillStyle='rgba(255,255,255,.3)';cx.fill();
+    for(let k=0;k<7;k++){const a=Math.PI+(k+.5)/7*Math.PI,x=Math.cos(a)*w*.92,y=Math.sin(a)*h*1.1+2;glow(x,y,8,'#7ff7ff',.7);circ(x,y,1.8);cx.fillStyle='#d9ffff';cx.fill()}
+    glow(0,-8,18,ag?'#ff8a2a':'#ff5fd2',.6);ell(0,-8,6,5);cx.fillStyle=ag?'#ff8a2a':C('#ff7ad9');cx.fill();
+  },
+  bristle(e,ag){
+    tailFork(-18,11,Math.sin(e.anim*14)*.35,'#3a4050');
+    bodyBelly(40,9,.85,'#4f586a','#a7b0bf',2,6,16,3.5);
+    cx.save();cx.lineWidth=1.6;cx.beginPath();cx.moveTo(19,1);cx.lineTo(6,4);cx.stroke();cx.restore();
+    for(let i=0;i<5;i++){const x=-10+i*6;glow(x,6.5,5,'#7fd8ff',.6);circ(x,6.5,1.3);cx.fillStyle='#dff6ff';cx.fill()}
+    eyeDot(13,-2.5,2.4,ag);
+  },
+  viper(e,ag){
+    const wag=Math.sin(e.anim*(e.st==='lunge'?14:6))*.3,open=e.st==='windup'||e.st==='lunge';
+    tailFork(-58,22,wag,'#1a2236');
+    // a dorsal spine that dangles a glowing lure over its head
+    cx.save();cx.lineWidth=2.4;cx.beginPath();cx.moveTo(18,-11);cx.quadraticCurveTo(26,-46,48,-40);cx.stroke();cx.restore();
+    glow(49,-40,14,'#9ffcff',.8);circ(49,-40,3.4);cx.fillStyle='#e9ffff';cx.fill();cx.stroke();
+    bodyBelly(118,13,.6,'#26324c','#3e5f82',6,9,52,6);
+    cx.beginPath();cx.moveTo(42,2);cx.lineTo(66,open?13:6);cx.lineTo(44,10);cx.closePath();fs('#1a2236');
+    // fangs too long to fit inside its own mouth
+    cx.fillStyle='#f4f1e8';for(const[x,len]of[[50,17],[56,14],[61,10]]){cx.beginPath();cx.moveTo(x-2,4);cx.lineTo(x+1,4-len);cx.lineTo(x+3,4);cx.closePath();cx.fill();cx.stroke()}
+    cx.beginPath();cx.moveTo(59,-2);cx.lineTo(62,15);cx.lineTo(65,-2);cx.closePath();cx.fill();cx.stroke();
+    for(let i=0;i<8;i++){const x=-40+i*11;glow(x,9,5,'#5fc8ff',.5);circ(x,9,1.4);cx.fillStyle='#bfefff';cx.fill()}
+    eyeDot(46,-4,3.8,ag);
+  },
+  swallow(e,ag){
+    const wag=Math.sin(e.anim*(e.st==='lunge'?12:5))*.28,open=e.st==='windup'||e.st==='lunge';
+    tailFork(-56,20,wag,'#181a26');
+    bodyPath(118,12,.75);cx.fillStyle=C('#1d2030');cx.fill();cx.stroke();
+    // a stomach stretched thin enough to see its last meal
+    ell(6,18,36,26,.05);cx.fillStyle=C('#d8c3bb');cx.fill();cx.stroke();
+    cx.save();cx.globalAlpha*=.35;ell(4,20,22,9,.1);cx.fillStyle='#6b4f55';cx.fill();cx.restore();
+    ell(-6,8,14,5,-.1);cx.fillStyle='rgba(255,255,255,.35)';cx.fill();
+    cx.beginPath();cx.moveTo(40,2);cx.lineTo(62,open?17:6);cx.lineTo(38,12);cx.closePath();fs('#181a26');
+    cx.fillStyle='#f4f1e8';for(let i=0;i<4;i++){cx.beginPath();cx.moveTo(44+i*4.5,4);cx.lineTo(46+i*4.5,-1);cx.lineTo(48+i*4.5,4);cx.closePath();cx.fill()}
+    eyeDot(48,-4,3,ag);
+  },
+  squid(e,ag){
+    const sw=e.anim*(e.st==='lunge'?9:4);
+    // eight arms and two long feeding tentacles trail behind the head; the mantle leads
+    for(let i=0;i<10;i++){const long=i>=8,len=long?250:150,yo=(i-4.5)*4,n=8;cx.beginPath();cx.moveTo(-4,yo);
+      for(let k=1;k<=n;k++){const t=k/n;cx.lineTo(-4-len*t,yo*(1+t*1.5)+Math.sin(sw+t*5+i)*10*t)}
+      cx.lineWidth=long?6:9;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=long?3:5;cx.strokeStyle=C(i%2?'#9c3634':'#b0413e');cx.stroke();
+      if(long){const ex=-4-len,ey=yo*2.5+Math.sin(sw+5+i)*10;cx.lineWidth=2.6;cx.strokeStyle=INK;ell(ex,ey,12,6);fs('#b0413e')}}
+    cx.lineWidth=3.2;cx.strokeStyle=INK;
+    ell(4,0,22,20);fs('#a33d3a');
+    cx.beginPath();cx.moveTo(150,-14);cx.lineTo(180,-36);cx.lineTo(176,0);cx.lineTo(180,36);cx.lineTo(150,14);cx.closePath();fs('#9c3634');
+    cx.beginPath();cx.moveTo(18,-30);cx.bezierCurveTo(80,-44,150,-26,184,0);cx.bezierCurveTo(150,26,80,44,18,30);cx.quadraticCurveTo(8,0,18,-30);cx.closePath();fs('#b9504a');
+    cx.fillStyle=C('#8a2f2d');for(const[x,y,r]of[[60,-14,5],[90,8,4],[120,-6,4],[45,16,3.5],[140,10,3]]){circ(x,y,r);cx.fill()}
+    // the biggest eye in the ocean
+    circ(6,-4,11);cx.fillStyle='#f1ece0';cx.fill();cx.stroke();circ(8,-4,6.5);cx.fillStyle=ag?'#ff8a2a':INK;cx.fill();circ(5,-7,2.2);cx.fillStyle='#fff';cx.fill();
+  },
+  sperm(e,ag){
+    const wag=Math.sin(e.anim*(e.st==='lunge'?6:2))*.2,jaw=e.st==='windup'||e.st==='lunge'?.28:.04;
+    tailFork(-236,82,wag,'#3a3f49');
+    // a narrow lower jaw lined with teeth, which drops open to bite
+    cx.save();cx.translate(70,44);cx.rotate(jaw);rr(0,-6,160,12,6);fs('#cfd2d6');
+    cx.fillStyle='#fffaf0';for(let i=0;i<9;i++){cx.beginPath();cx.moveTo(30+i*14,-6);cx.lineTo(34+i*14,-15);cx.lineTo(38+i*14,-6);cx.closePath();cx.fill();cx.stroke()}cx.restore();
+    const body=()=>{cx.beginPath();cx.moveTo(258,-30);cx.quadraticCurveTo(262,-80,212,-82);cx.lineTo(40,-80);cx.bezierCurveTo(-80,-76,-180,-40,-240,-14);cx.lineTo(-240,14);
+      cx.bezierCurveTo(-170,40,-60,62,40,58);cx.lineTo(200,50);cx.quadraticCurveTo(262,48,260,4);cx.closePath()};
+    body();cx.fillStyle=C('#4a4f5a');cx.fill();cx.save();cx.clip();
+    cx.lineWidth=2;cx.strokeStyle=C('#3a3e47');for(let i=0;i<9;i++){cx.beginPath();cx.moveTo(-200+i*24,-50+i*2);cx.quadraticCurveTo(-190+i*24,0,-200+i*24,40-i*2);cx.stroke()}
+    ell(120,-52,120,16);cx.fillStyle='rgba(255,255,255,.08)';cx.fill();
+    cx.strokeStyle='rgba(220,225,230,.35)';for(const[x,y,w]of[[180,-24,18],[130,4,24],[210,16,12],[90,-40,16]]){cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+w,y+5);cx.stroke()}
+    cx.restore();cx.lineWidth=4;cx.strokeStyle=INK;body();cx.stroke();
+    for(const x of[-120,-150,-178]){cx.beginPath();cx.arc(x,-44-(x+120)*.25,9,Math.PI,TAU);cx.closePath();fs('#43474f')}
+    cx.beginPath();cx.moveTo(40,40);cx.quadraticCurveTo(20,80,-10,86);cx.quadraticCurveTo(10,60,24,40);cx.closePath();fs('#3f444e');
+    eyeDot(64,14,4.5,ag);
+  },
 };
-const PORT={jelly:[48,70,0,8],crab:[96,54,0,-5],turtle:[120,74,5,-4],sword:[240,74,18,-13],shark:[230,108,-16,-6],orca:[260,190,-17,-22],whale:[500,250,-30,10]};
+const PORT={jelly:[48,70,0,8],crab:[96,54,0,-5],turtle:[120,74,5,-4],sword:[240,74,18,-13],shark:[230,108,-16,-6],orca:[260,190,-17,-22],whale:[500,250,-30,10],
+  djelly:[64,112,0,16],bristle:[48,28,1,0],viper:[132,100,4,-12],swallow:[132,92,4,10],squid:[440,110,-30,0],sperm:[520,190,10,-2]};
 
 // ===================================================================== drawing: parts (dropped loot and HUD icons), size ~ 14
 function drawPart(t){
@@ -454,17 +591,39 @@ function drawPart(t){
   else if(t==='sword'){cx.beginPath();cx.moveTo(-11,9);cx.lineTo(13,-12);cx.lineTo(-6,13);cx.closePath();fs('#b9c8d6')}
   else if(t==='shark'){cx.beginPath();cx.moveTo(-9,8);cx.lineTo(-6,4);cx.lineTo(-4,0);cx.lineTo(-2,-5);cx.lineTo(0,-12);cx.lineTo(3,-5);cx.lineTo(5,0);cx.lineTo(7,4);cx.lineTo(9,8);cx.quadraticCurveTo(0,12,-9,8);cx.closePath();fs('#f3efe2')}
   else if(t==='orca'){cx.beginPath();cx.moveTo(-10,10);cx.quadraticCurveTo(-2,0,-4,-13);cx.quadraticCurveTo(8,-2,11,10);cx.closePath();fs('#262b39');ell(-1,-1,2,4,.3);cx.fillStyle='#eef0ec';cx.fill()}
+  else if(t==='djelly'){glow(0,0,15,'#7ff7ff',.45);cx.beginPath();cx.moveTo(-12,6);cx.bezierCurveTo(-12,-16,12,-16,12,6);cx.quadraticCurveTo(0,2,-12,6);cx.closePath();fs('#4b3fb8');for(const x of[-7,0,7]){circ(x,2,1.6);cx.fillStyle='#d9ffff';cx.fill()}}
+  else if(t==='bristle'){glow(0,0,13,'#7fd8ff',.4);ell(0,0,8,11,.3);fs('#aab3c2');circ(1,1,2.6);cx.fillStyle='#dff6ff';cx.fill()}
+  else if(t==='viper'){cx.beginPath();cx.moveTo(-6,12);cx.quadraticCurveTo(-8,-6,8,-13);cx.quadraticCurveTo(0,-2,2,12);cx.closePath();fs('#f4f1e8')}
+  else if(t==='swallow'){ell(0,1,11,9,.2);fs('#d8c3bb');ell(-3,-2,4,2,-.3);cx.fillStyle='rgba(255,255,255,.5)';cx.fill();cx.save();cx.globalAlpha=.4;ell(1,3,6,3,.2);cx.fillStyle='#6b4f55';cx.fill();cx.restore()}
+  else if(t==='squid'){cx.beginPath();cx.moveTo(-9,8);cx.quadraticCurveTo(-10,-8,4,-11);cx.quadraticCurveTo(12,-10,9,-2);cx.lineTo(3,-3);cx.quadraticCurveTo(2,6,-9,8);cx.closePath();fs('#3a2a22')}
+  else if(t==='sperm'){cx.beginPath();cx.moveTo(-11,4);cx.quadraticCurveTo(-12,-8,-2,-10);cx.quadraticCurveTo(10,-11,11,0);cx.quadraticCurveTo(10,10,0,10);cx.quadraticCurveTo(-10,11,-11,4);cx.closePath();fs('#c9bd8f');circ(-3,-3,2);cx.fillStyle='rgba(255,255,255,.4)';cx.fill();circ(4,4,1.6);cx.fillStyle='rgba(90,80,50,.5)';cx.fill()}
   else{rr(-11,-10,22,7,3);fs('#d9a648');cx.beginPath();for(let i=0;i<5;i++){cx.moveTo(-9+i*4.5,-3);cx.lineTo(-9+i*4.5,11)}cx.lineWidth=3.4;cx.stroke();cx.lineWidth=1.6;cx.strokeStyle='#f0cf86';cx.stroke()}
 }
 function partIcon(t,px=26){const c=document.createElement('canvas');c.width=c.height=px*2;const k=c.getContext('2d'),o=cx;cx=k;k.scale(px*2/32,px*2/32);k.translate(16,16);drawPart(t);cx=o;return c}
 
 // ===================================================================== drawing: the player fish and its gun
-function drawGun(t,fire){
+function drawGun(t,fire,col){
   cx.lineWidth=2.4;cx.strokeStyle=INK;
   if(t===0){rr(-1,1,6,10,2);fs('#3a3f4a');rr(-4,-4,22,7,2.5);fs('#7b8494');rr(14,-5.5,4,3,1);fs('#5b6270')}
   else if(t===1){rr(-16,-2,15,8,3);fs('#7a5233');rr(5,2,5,10,1.5);fs('#3a3f4a');rr(-3,-4,25,8,2);fs('#4f5866');rr(20,-2.5,20,4.5,1.5);fs('#353b46');rr(4,-10,13,4.5,2);fs('#262a33')}
   else if(t===2){rr(2,4,6,10,2);fs('#3a3f4a');rr(-24,-5,6,10,2);fs('#3e5226');rr(-20,-7,54,14,6);fs('#62803c');rr(14,-7.5,6,15,1);fs('#d1453a');rr(30,-8.5,6,17,3);fs('#3e5226')}
-  else{rr(0,5,7,10,2);fs('#2a2d38');rr(-18,-10,48,19,8);fs('#2b2f3c');for(let i=0;i<3;i++){circ(-6+i*11,0,4);cx.fillStyle=fire?'#ffd0c8':'#ff3b3b';cx.fill();cx.stroke()}rr(28,-7,14,13,4);fs('#8c1e1e');circ(43,-.5,4.5);cx.fillStyle=fire?'#fff':'#ff6a5a';cx.fill();cx.stroke()}
+  else if(t===3){rr(0,5,7,10,2);fs('#2a2d38');rr(-18,-10,48,19,8);fs('#2b2f3c');for(let i=0;i<3;i++){circ(-6+i*11,0,4);cx.fillStyle=fire?'#ffd0c8':'#ff3b3b';cx.fill();cx.stroke()}rr(28,-7,14,13,4);fs('#8c1e1e');circ(43,-.5,4.5);cx.fillStyle=fire?'#fff':'#ff6a5a';cx.fill();cx.stroke()}
+  else if(t===4){ // Bubble Blaster: a glass tank, a brass barrel and a flared bell
+    rr(2,4,6,10,2);fs('#3a3f4a');rr(-16,-8,26,16,8);fs('#2f7f9e');ell(-3,-3,8,3);cx.fillStyle='rgba(255,255,255,.35)';cx.fill();
+    rr(8,-4,20,8,3);fs('#c9a447');cx.beginPath();cx.moveTo(26,-5);cx.lineTo(40,-12);cx.lineTo(40,12);cx.lineTo(26,5);cx.closePath();fs('#e0bd57');
+    for(const[x,y,r]of[[-10,-13,2.6],[-3,-16,1.8],[33,-16,2]]){circ(x,y,r);cx.fillStyle='rgba(220,245,255,.9)';cx.fill()}}
+  else if(t===5){ // Light Show: a dark body with a rainbow band and a crystal prism at the muzzle
+    rr(0,4,6,10,2);fs('#2a2d38');rr(-16,-6,44,12,5);fs('#22252f');
+    const gr=cx.createLinearGradient(-12,0,24,0);['#ff4d6d','#ffb347','#fff36b','#5dff8f','#4dc3ff','#b06bff'].forEach((c,i,a)=>gr.addColorStop(i/(a.length-1),c));rr(-12,-2,36,4,2);cx.fillStyle=gr;cx.fill();
+    cx.beginPath();cx.moveTo(28,-9);cx.lineTo(46,0);cx.lineTo(28,9);cx.closePath();cx.fillStyle=fire?'#ffffff':'rgba(200,240,255,.9)';cx.fill();cx.stroke()}
+  else if(t===6){ // Tooth Shooter: a bony jaw that snaps out a row of teeth
+    rr(0,4,6,10,2);fs('#3a3f4a');cx.beginPath();cx.moveTo(-16,-8);cx.quadraticCurveTo(10,-12,44,-8);cx.lineTo(44,8);cx.quadraticCurveTo(10,12,-16,8);cx.closePath();fs('#e9e2cf');
+    rr(14,-6,30,12,3);fs('#c45a6a');cx.fillStyle='#fffaf0';
+    for(let i=0;i<5;i++)for(const sd of[-1,1]){cx.beginPath();cx.moveTo(16+i*6,sd*6);cx.lineTo(19+i*6,sd*.5);cx.lineTo(22+i*6,sd*6);cx.closePath();cx.fill();cx.stroke()}}
+  else{ // Mega Beam: a heavier laser that glows in its owner's colour
+    const c=col||'#ff3b3b',lt=mix(c,'#ffffff',.6);rr(0,6,8,12,2);fs('#2a2d38');rr(-22,-13,60,26,10);fs('#23262f');
+    for(let i=0;i<4;i++){circ(-12+i*11,0,4.5);cx.fillStyle=fire?lt:c;cx.fill();cx.stroke()}
+    rr(36,-10,18,20,5);fs(mix(c,'#000000',.4));circ(56,0,6.5);cx.fillStyle=fire?'#fff':lt;cx.fill();cx.stroke()}
 }
 function drawFish(p,col,tier){
   const face=p.face,la=face>0?p.aim:Math.PI-p.aim,dark=mix(col,'#000000',.32),light=mix(col,'#ffffff',.45);
@@ -475,7 +634,7 @@ function drawFish(p,col,tier){
   bodyPath(50,16,.98,.3);cx.fillStyle=col;cx.fill();cx.save();cx.clip();ell(4,-7,17,4.5,-.06);cx.fillStyle=light;cx.globalAlpha=.6;cx.fill();cx.globalAlpha=1;
   cx.fillStyle=dark;for(const[x,y]of[[-6,3],[2,6],[-12,-2],[8,2]]){circ(x,y,1.2);cx.fill()}cx.restore();bodyPath(50,16,.98,.3);cx.stroke();
   eyeDot(13,-3,4.2,false);
-  cx.save();cx.translate(-1,6);cx.rotate(la-(p.tilt||0));drawGun(tier,p.laser);cx.restore();
+  cx.save();cx.translate(-1,6);cx.rotate(la-(p.tilt||0));drawGun(tier,p.laser,col);cx.restore();
   cx.lineWidth=2.4;ell(-2,8,6,3.6,.5);cx.fillStyle=dark;cx.fill();cx.stroke();
   cx.restore();
 }
@@ -486,11 +645,11 @@ function muzzle(p,t){const b=gunBase(p),l=GUNS[t].ml;return{x:b.x+Math.cos(p.aim
 let state='title',T=0,shake=0,hurtFlash=0,muted=false;
 let pl=null,tier=0,bag={},kills=0,killsBy={},runTime=0,deadT=0;
 let creatures=[],proj=[],parts=[],drops=[],cid=1,gid=1,spawnT=0;
-const cam={x:WW/2,y:FL-520};
+const cam={x:WW/2,y:ZF(0)-520};
 const K={},mouse={x:0,y:0,down:false,seen:false};
 function emptyBag(){const b={};for(const t of ORDER)b[t]=0;return b}
 bag=emptyBag();killsBy=emptyBag();
-function newPlayer(x,y){x=x??WW/2+rand(-150,150);return{id:'me',x,y:y??floorY(x)-360,vx:0,vy:0,aim:0,face:1,tilt:0,hp:100,max:100,inv:1,alive:true,cd:0,hurtT:9,tail:0,laser:false,dashT:0,dashCd:0}}
+function newPlayer(x,y){x=x??WW/2+rand(-150,150);return{id:'me',z:zone,x,y:y??floorY(x)-360,vx:0,vy:0,aim:0,face:1,tilt:0,hp:100,max:100,inv:1,alive:true,cd:0,hurtT:9,tail:0,laser:false,dashT:0,dashCd:0}}
 const DASH_SPEED=860,DASH_TIME=.2,DASH_CD=.9;let dashPressed=false;
 
 // ===================================================================== audio
@@ -520,14 +679,20 @@ function gunshot(vol,pitch,len,thumpHz,far=1){
 function thump(vol,f0,f1,d){if(!AC||muted)return;const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+d);
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.003);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.05)}
 // a filtered noise sweep (rocket whoosh, explosion rumble)
-function band(d,vol,f0,f1){if(!AC||muted)return;nbuf();const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=_nb;s.loop=true;
+function sweep(d,vol,f0,f1){if(!AC||muted)return;nbuf();const t=AC.currentTime,s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=_nb;s.loop=true;
   f.type='lowpass';f.frequency.setValueAtTime(f0,t);f.frequency.exponentialRampToValueAtTime(f1,t+d);g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(.001,t+d);
   s.connect(f);f.connect(g);g.connect(master);s.start(t);s.stop(t+d+.05)}
 const sfx={
   shot(t){if(T-lastShotSfx<.05)return;lastShotSfx=T;if(t===0)gunshot(.55,1,.11,140);else gunshot(.42,1.35,.07,115)},
-  rocket(v=1){gunshot(.3*v,.6,.08,90);band(.5,.35*v,500,2200)},
-  boom(){band(1.1,.7,90,700);thump(.6,70,22,.6);band(.6,.3,1400,300)},
-  elaser(){tone(70,.6,'sawtooth',.12,140);band(.5,.15,3000,800)},
+  rocket(v=1){gunshot(.3*v,.6,.08,90);sweep(.5,.35*v,500,2200)},
+  boom(){sweep(1.1,.7,90,700);thump(.6,70,22,.6);sweep(.6,.3,1400,300)},
+  elaser(mega){tone(mega?45:70,.6,'sawtooth',.12,mega?90:140);sweep(.5,.15,mega?1800:3000,800)},
+  // Twilight guns: a fizzing spray, a bright zap, a crunching snap
+  bubble(v=1){sweep(.35,.3*v,3000,600);for(let i=0;i<4;i++)setTimeout(()=>tone(rand(500,900),.07,'sine',.07*v,rand(1000,1700)),i*35)},
+  light(v=1){if(T-lastShotSfx<.05&&v===1)return;if(v===1)lastShotSfx=T;tone(rand(1500,2100),.07,'square',.05*v,500);tone(rand(2400,3000),.05,'sine',.05*v,1200)},
+  teeth(){gunshot(.5,.8,.09,100);noise(.08,.25,2600)},
+  breach(){sweep(2.2,.8,80,500);thump(.8,60,20,1);setTimeout(()=>{sweep(1.2,.5,200,900);thump(.6,90,25,.6)},250)},
+  zone(){tone(90,1.4,'sine',.18,40);sweep(1.4,.2,300,1200)},
   hit(){tone(900,.04,'triangle',.06,500)},
   eshot(){if(T-lastEShot<.05)return;lastEShot=T;gunshot(.28,.75,.09,120,.45)},
   kill(big){tone(big?140:320,.35,'triangle',.25,big?60:120);noise(.25,.2,900)},
@@ -538,7 +703,7 @@ const sfx={
 };
 function laserSound(on){
   if(!AC||muted)on=false;
-  if(on&&!laserOsc){const o=AC.createOscillator(),o2=AC.createOscillator(),g=AC.createGain();o.type='sawtooth';o.frequency.value=110;o2.type='square';o2.frequency.value=221;g.gain.value=.06;o.connect(g);o2.connect(g);g.connect(master);o.start();o2.start();laserOsc={o,o2,g}}
+  if(on&&!laserOsc){const o=AC.createOscillator(),o2=AC.createOscillator(),g=AC.createGain();const lo=tier===7?72:110;o.type='sawtooth';o.frequency.value=lo;o2.type='square';o2.frequency.value=lo*2.01;g.gain.value=.06;o.connect(g);o2.connect(g);g.connect(master);o.start();o2.start();laserOsc={o,o2,g}}
   else if(!on&&laserOsc){const l=laserOsc;laserOsc=null;try{l.g.gain.setTargetAtTime(0,AC.currentTime,.03);setTimeout(()=>{l.o.stop();l.o2.stop()},150)}catch(e){}}
 }
 
@@ -554,34 +719,41 @@ function explosionFx(x,y,R){
 }
 
 // ===================================================================== creatures
-function mkCreature(t,x,y,g){const s=SP[t],hp=Math.round(s.hp*DM());return{id:cid++,t,x,y,vx:0,vy:0,hp,max:hp,st:'wander',stT:0,wt:0,wa:Math.random()<.5?0:Math.PI,walk:0,face:Math.random()<.5?1:-1,tilt:0,
+function mkCreature(t,x,y,g,z=SP[t].z){const s=SP[t],hp=Math.round(s.hp*DM());return{id:cid++,t,z,x,y,vx:0,vy:0,hp,max:hp,st:'wander',stT:0,wt:0,wa:Math.random()<.5?0:Math.PI,walk:0,face:Math.random()<.5?1:-1,tilt:0,
   anim:Math.random()*10,ph:Math.random()*TAU,tgt:null,ac:0,cd:0,gid:g,flash:0,dead:false,deadT:0,lastHitMe:-99,sting:0,lastAcHit:-1,pulse:Math.random()*2,
   rot:0,swim:false,rage:false,gun:rollGun(t),lz:0,lzT:0,gaim:0,tgaim:0,gcd:rand(.8,1.6),burst:4,px:x,py:y}}
-// 7% of creatures carry a handgun, 3% a rifle (gun = tier + 1, 0 = unarmed)
-function rollGun(t){const r=Math.random(),m=DM();
+// gun = tier + 1, 0 = unarmed. Sunlit: 7% carry a handgun, 3% a rifle; whales never carry small guns, 40% carry the laser.
+// Twilight: 10% carry a Twilight gun suited to their size; sperm whales carry the Mega Beam 40% of the time.
+// Guns Galore arms everyone. Difficulty raises every chance.
+function rollGun(t){const r=Math.random(),m=DM(),r2_=Math.random();
+  if(SP[t].z===1){
+    if(t==='sperm')return gg||r<.4*m?8:0;
+    const zoneGun=t==='djelly'?5:t==='bristle'?(r2_<.6?5:6):t==='squid'?7:(r2_<.5?6:7);
+    return gg||r<.10*m?zoneGun:0}
   if(gg){if(t==='jelly')return 1;if(t==='whale')return 4;if(t==='shark'||t==='orca')return r<.4?2:3;return r<.4?1:2}
-  if(t==='whale')return r<.4*m?4:0; // whales never carry small guns: 40% carry the huge red laser
+  if(t==='whale')return r<.4*m?4:0;
   return r<.03*m?2:r<.10*m?1:0}
-const rollers=t=>t==='jelly'||t==='crab'; // these turn their whole body toward the player instead of tilting
+const rollers=t=>!!SP[t].roll; // these turn their whole body toward the player instead of tilting
 // a point on the sprite in world space, matching the draw transform exactly
 function l2w(e,lx,ly){
   if(rollers(e.t)){const c=Math.cos(e.rot),s=Math.sin(e.rot),x=lx*e.face;return{x:e.x+x*c-ly*s,y:e.y+x*s+ly*c}}
   const c=Math.cos(e.tilt),s=Math.sin(e.tilt);return{x:e.x+(lx*c-ly*s)*e.face,y:e.y+lx*s+ly*c}}
 function circlesOf(e){const out=[];for(const[lx,ly,r]of SP[e.t].C){const p=l2w(e,lx,ly);out.push([p.x,p.y,r])}return out}
 function lerpAngle(a,b,k){const d=((b-a+Math.PI)%TAU+TAU)%TAU-Math.PI;return a+d*k}
-function nearestPlayer(e){let best=null,bd=1e9;for(const p of players()){const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<bd){bd=d;best=p}}return best}
+function nearestPlayer(e){let best=null,bd=1e9;for(const p of players(e.z)){const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<bd){bd=d;best=p}}return best}
 function isAggro(e){return e.mirror?!!e.ag:!!e.tgt}
-function players(){const l=[];if(pl&&pl.alive&&state!=='title')l.push(pl);if(NET.active&&NET.started)for(const r of NET.remotes.values())if(r.alive&&r.init)l.push(r);return l}
+// fish that are alive, optionally only those in zone z
+function players(z){const l=[];if(pl&&pl.alive&&state!=='title'&&(z===undefined||zone===z))l.push(pl);if(NET.active&&NET.started)for(const r of NET.remotes.values())if(r.alive&&r.init&&(z===undefined||r.z===z))l.push(r);return l}
 function playerById(id){return id==='me'?pl:NET.remotes.get(id)||null}
 function setSt(e,s){e.st=s;e.stT=0}
 function aggro(e,pid){for(const o of creatures)if(!o.dead&&!o.mirror&&(o===e||(o.gid===e.gid&&Math.hypot(o.x-e.x,o.y-e.y)<900))){if(!o.tgt){o.tgt=pid;if(o.st==='wander')setSt(o,'chase')}}e.tgt=pid}
-function floorLimit(e){return floorY(e.x)-SP[e.t].fm}
+function floorLimit(e){return floorY(e.x,e.z)-SP[e.t].fm}
 
 function updAI(e,dt){
   const s=SP[e.t];e.stT+=dt;e.cd-=dt;
   let tp=null;
-  if(e.tgt){tp=playerById(e.tgt);if(!tp||!tp.alive||Math.hypot(tp.x-e.x,tp.y-e.y)>1700){e.tgt=null;tp=null;setSt(e,'wander')}}
-  if(!e.tgt)for(const p of players())if(Math.hypot(p.x-e.x,p.y-e.y)<s.detect){aggro(e,p.id);tp=p;break}
+  if(e.tgt){tp=playerById(e.tgt);if(!tp||!tp.alive||tp.z!==e.z||Math.hypot(tp.x-e.x,tp.y-e.y)>1700){e.tgt=null;tp=null;setSt(e,'wander')}}
+  if(!e.tgt)for(const p of players(e.z))if(Math.hypot(p.x-e.x,p.y-e.y)<s.detect){aggro(e,p.id);tp=p;break}
   // crabs walk the sand until something sets them off, then push off the floor and swim at the player
   if(e.t==='crab'&&!e.swim){
     if(tp){e.swim=true;e.vy=-300;e.vx*=.4;setSt(e,'chase');bubbles(e.x,e.y+14,8,40)}
@@ -592,16 +764,16 @@ function updAI(e,dt){
   if(!tp){
     if(e.st!=='wander')setSt(e,'wander');
     e.wt-=dt;if(e.wt<=0){e.wt=rand(3,7);e.wa=(Math.random()<.5?0:Math.PI)+rand(-.35,.35)}
-    if(e.y<TOP+220)e.wa=Math.atan2(.5,Math.cos(e.wa));if(e.y>floorLimit(e)-60)e.wa=Math.atan2(-.5,Math.cos(e.wa));
+    if(e.y<ZT(e.z)+220)e.wa=Math.atan2(.5,Math.cos(e.wa));if(e.y>floorLimit(e)-60)e.wa=Math.atan2(-.5,Math.cos(e.wa));
     if(e.x<300)e.wa=0;if(e.x>WW-300)e.wa=Math.PI;
-    if(e.t==='jelly'){e.pulse-=dt;dvx=Math.cos(e.wa)*12;dvy=18;if(e.pulse<=0){e.pulse=rand(1.8,2.8);e.vy=-55+(e.y<TOP+300?60:0)}turn=.8}
+    if(s.jel){e.pulse-=dt;dvx=Math.cos(e.wa)*12;dvy=18;if(e.pulse<=0){e.pulse=rand(1.8,2.8);e.vy=-55+(e.y<ZT(e.z)+300?60:0)}turn=.8}
     else if(e.t==='crab'){dvx=0;dvy=160;turn=2} // lost interest: sink back to the sand
     else{dvx=Math.cos(e.wa)*s.spd;dvy=Math.sin(e.wa)*s.spd*.6}
   }else{
     const dx=tp.x-e.x,dy=tp.y-e.y,d=Math.hypot(dx,dy)||1;
     if(e.st==='wander')setSt(e,'chase');
     if(e.st==='chase'){
-      if(e.t==='jelly'){e.pulse-=dt;dvx=dx/d*chase;dvy=dy/d*chase;if(e.pulse<=0){e.pulse=rand(.9,1.3);e.vx+=dx/d*60;e.vy+=dy/d*60}}
+      if(s.jel){e.pulse-=dt;dvx=dx/d*chase;dvy=dy/d*chase;if(e.pulse<=0){e.pulse=rand(.9,1.3);e.vx+=dx/d*60;e.vy+=dy/d*60}}
       else{dvx=dx/d*chase;dvy=dy/d*chase;if(L&&e.cd<=0&&d<L.r)setSt(e,'windup')}
     }
     if(e.st==='windup'){dvx=-dx/d*25;dvy=-dy/d*25;turn=5;e.face=dx<0?-1:1;
@@ -611,51 +783,60 @@ function updAI(e,dt){
   }
   if(dvx!==null){const k=Math.min(1,dt*turn);e.vx+=(dvx-e.vx)*k;e.vy+=(dvy-e.vy)*k}
   e.x+=e.vx*dt;e.y+=e.vy*dt;
-  if(e.y<TOP+40){e.y=TOP+40;e.vy=Math.max(e.vy,0)}
+  if(e.y<ZT(e.z)+40){e.y=ZT(e.z)+40;e.vy=Math.max(e.vy,0)}
   const fl=floorLimit(e);if(e.y>fl){e.y=fl;e.vy=Math.min(e.vy,0);if(e.t==='crab'&&!tp){e.swim=false;e.vx=0;setSt(e,'wander')}}
   if(e.x<80){e.x=80;e.vx=Math.abs(e.vx)}if(e.x>WW-80){e.x=WW-80;e.vx=-Math.abs(e.vx)}
 }
 function crabWalk(e,dt,s){
   if(e.st!=='wander')setSt(e,'wander');e.wt-=dt;if(e.wt<=0){e.wt=rand(1.2,3.5);e.walk=Math.random()<.35?0:(Math.random()<.5?-1:1)}
   if(e.x<300)e.walk=1;if(e.x>WW-300)e.walk=-1;if(e.walk)e.face=e.walk;
-  e.vx+=(e.walk*s.spd-e.vx)*Math.min(1,dt*6);e.x=clamp(e.x+e.vx*dt,80,WW-80);e.y=floorY(e.x)-16;e.vy=0;
+  e.vx+=(e.walk*s.spd-e.vx)*Math.min(1,dt*6);e.x=clamp(e.x+e.vx*dt,80,WW-80);e.y=floorY(e.x,e.z)-16;e.vy=0;
 }
-// Armed creatures aim at whoever they are after and shoot. e.gun: 1 handgun, 2 rifle, 3 bazooka, 4 huge red laser.
-// The laser charges (a thin warning line), then fires a beam for a while that turns slowly, so you can swim out of it.
-const LZ_CHARGE=.9,LZ_FIRE=1.6,LZ_COOL=3,LZ_TURN=.9,LZ_DPS=45;
+// Armed creatures aim at whoever they are after and shoot. e.gun is the tier + 1: 1 handgun, 2 rifle, 3 bazooka,
+// 4 huge red laser, 5 Bubble Blaster, 6 Light Show, 7 Tooth Shooter, 8 Mega Beam.
+// Beams charge (a thin warning line), then fire for a while and turn slowly, so you can swim out of them.
+const LZ_CHARGE=.9,LZ_FIRE=1.6,LZ_COOL=3,LZ_TURN=.9,LZ_DPS=45,MEGA_E='#3fd0ff';
+const beamGun=e=>e.gun>0&&isLaser(e.gun-1);
 function gunMuzzle(e){const s=SP[e.t],m=l2w(e,s.gm[0],s.gm[1]),l=GUNS[e.gun-1].ml*s.gm[2];return{x:m.x+Math.cos(e.gaim)*l,y:m.y+Math.sin(e.gaim)*l,gx:m.x,gy:m.y}}
-function creatureBeam(e){const m=gunMuzzle(e),L=GUNS[3].range*1.1,dx=Math.cos(e.gaim),dy=Math.sin(e.gaim);let len=L;
-  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x)+4){len=s;break}}return{x1:m.x,y1:m.y,x2:m.x+dx*len,y2:m.y+dy*len}}
+function creatureBeam(e){const m=gunMuzzle(e),L=GUNS[e.gun-1].range*1.1,dx=Math.cos(e.gaim),dy=Math.sin(e.gaim);let len=L;
+  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x,e.z)+4||wallHit(x,y,e.z)){len=s;break}}return{x1:m.x,y1:m.y,x2:m.x+dx*len,y2:m.y+dy*len}}
+const GUN_RANGE={1:760,2:760,3:1000,4:950,5:550,6:1000,7:900,8:1250};
 function enemyGun(e,dt){
   if(!e.gun||e.dead)return;const tp=e.tgt?playerById(e.tgt):null,m=gunMuzzle(e),fr=DM();
   const ta=tp?Math.atan2(tp.y-m.gy,tp.x-m.gx):(e.face>0?0:Math.PI)+(rollers(e.t)?0:e.tilt*e.face);
-  if(e.gun===4&&e.lz===2){const d=((ta-e.gaim+Math.PI)%TAU+TAU)%TAU-Math.PI;e.gaim+=clamp(d,-LZ_TURN*dt,LZ_TURN*dt)}
+  if(beamGun(e)&&e.lz===2){const d=((ta-e.gaim+Math.PI)%TAU+TAU)%TAU-Math.PI;e.gaim+=clamp(d,-LZ_TURN*dt,LZ_TURN*dt)}
   else e.gaim=lerpAngle(e.gaim,ta,Math.min(1,dt*6));
   e.gcd-=dt;
-  const inRange=tp&&tp.alive&&Math.hypot(tp.x-m.gx,tp.y-m.gy)<(e.gun===4?950:e.gun===3?1000:760);
-  if(e.gun===4){
+  const inRange=tp&&tp.alive&&Math.hypot(tp.x-m.gx,tp.y-m.gy)<GUN_RANGE[e.gun];
+  if(beamGun(e)){
     e.lzT-=dt;
-    if(e.lz===1&&e.lzT<=0){e.lz=2;e.lzT=LZ_FIRE;if(pl&&Math.hypot(e.x-pl.x,e.y-pl.y)<1200)sfx.elaser()}
+    if(e.lz===1&&e.lzT<=0){e.lz=2;e.lzT=LZ_FIRE;if(e.z===zone&&pl&&Math.hypot(e.x-pl.x,e.y-pl.y)<1200)sfx.elaser(e.gun===8)}
     else if(e.lz===2&&e.lzT<=0){e.lz=0;e.gcd=LZ_COOL/fr}
     else if(e.lz===0&&inRange&&e.gcd<=0){e.lz=1;e.lzT=LZ_CHARGE}
     if(!tp&&e.lz){e.lz=0;e.gcd=1}
     return}
   if(!inRange||e.gcd>0)return;
-  if(e.gun===1)e.gcd=rand(1,1.5)/fr;else if(e.gun===3)e.gcd=rand(2,2.6)/fr;else{e.gcd=.13/fr;if(--e.burst<=0){e.burst=4;e.gcd=1.7/fr}}
+  const g=e.gun;
+  if(g===1)e.gcd=rand(1,1.5)/fr;else if(g===3)e.gcd=rand(2,2.6)/fr;else if(g===5)e.gcd=rand(1.6,2.2)/fr;else if(g===7)e.gcd=rand(1.4,1.9)/fr;
+  else{const n=g===6?6:4,gap=g===6?.09:.13;e.gcd=gap/fr;if(--e.burst<=0){e.burst=n;e.gcd=(g===6?1.8:1.7)/fr}}
   const a=e.gaim+rand(-.07,.07);
-  addEnemyShot(m.x,m.y,a,e.gun-1);
-  if(NET.active&&NET.host)NET.out.B.push(mkSeq([Math.round(m.x),Math.round(m.y),r2(a),e.gun-1]));
+  // the host runs every zone; only shots in this page's own zone become projectiles here
+  if(e.z===zone)addEnemyShot(m.x,m.y,a,g-1);
+  if(NET.active&&NET.host)NET.out.B.push(mkSeq([Math.round(m.x),Math.round(m.y),r2(a),g-1,e.z]));
 }
 function addEnemyShot(x,y,a,g){
-  if(g===2){const G=GUNS[2],s=G.speed*BS();proj.push({k:'erocket',x,y,px:x,py:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,a,t:2,own:false,trav:0,range:G.range,dmg:30*DM()})}
-  else{const s=1240*BS();proj.push({k:'ebullet',x,y,px:x,py:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,a,t:g,own:false,trav:0,range:820,dmg:(g===0?7:4)*DM()});part({k:'flash',x,y,r:9,life:.06,max:.06})}
-  if(pl&&state!=='title'&&Math.hypot(x-pl.x,y-pl.y)<900){if(g===2)sfx.rocket(.5);else sfx.eshot()}
+  const dm=DM(),bs=BS(),base={x,y,px:x,py:y,a,t:g,own:false,trav:0};
+  if(g===2){const G=GUNS[2],s=G.speed*bs;proj.push({...base,k:'erocket',vx:Math.cos(a)*s,vy:Math.sin(a)*s,range:G.range,dmg:30*dm})}
+  else if(g===4){for(let i=0;i<7;i++){const aa=a+rand(-.35,.35),s=1100*bs*rand(.6,1.1);proj.push({...base,k:'ebullet',st:'bubble',vx:Math.cos(aa)*s,vy:Math.sin(aa)*s,range:600,dmg:5*dm,r:rand(4,7),life:rand(.6,.9),ph:rand(0,TAU)})}}
+  else if(g===6){const nx=-Math.sin(a),ny=Math.cos(a),s=1300*bs;for(let i=-1;i<=1;i++)proj.push({...base,k:'ebullet',st:'tooth',x:x+nx*i*11,y:y+ny*i*11,px:x+nx*i*11,py:y+ny*i*11,vx:Math.cos(a)*s,vy:Math.sin(a)*s,range:900,dmg:9*dm})}
+  else{const light=g===5,s=(light?2000:1240)*bs;proj.push({...base,k:'ebullet',st:light?'light':'bullet',hue:rand(0,360),vx:Math.cos(a)*s,vy:Math.sin(a)*s,range:light?1000:820,dmg:(g===0?7:g===1?4:6)*dm});part({k:'flash',x,y,r:9,life:.06,max:.06})}
+  if(pl&&state!=='title'&&Math.hypot(x-pl.x,y-pl.y)<900){if(g===2)sfx.rocket(.5);else if(g===4)sfx.bubble(.5);else if(g===5)sfx.light(.5);else sfx.eshot()}
 }
 // a creature's beam burns this page's own fish continuously (no invulnerability window, but a dash still dodges it)
 function laserBurn(dt){
   if(!pl||!pl.alive||pl.dashT>0||state==='title')return;
-  for(const e of creatures){if(e.dead||e.gun!==4||e.lz!==2)continue;const b=creatureBeam(e);
-    if(segCircle(b.x1,b.y1,b.x2,b.y2,pl.x,pl.y,14)>=0){pl.hp-=LZ_DPS*DM()*dt;pl.hurtT=0;hurtFlash=Math.max(hurtFlash,.2);shake=Math.max(shake,3);if(Math.random()<dt*20)sparks(pl.x,pl.y,2,'#ff9a8a');if(pl.hp<=0){playerDie();return}}}
+  for(const e of creatures){if(e.dead||e.z!==zone||!beamGun(e)||e.lz!==2)continue;const b=creatureBeam(e),mega=e.gun===8;
+    if(segCircle(b.x1,b.y1,b.x2,b.y2,pl.x,pl.y,mega?28:14)>=0){pl.hp-=LZ_DPS*(mega?2:1)*DM()*dt;pl.hurtT=0;hurtFlash=Math.max(hurtFlash,.2);shake=Math.max(shake,3);if(Math.random()<dt*20)sparks(pl.x,pl.y,2,mega?'#9ff0ff':'#ff9a8a');if(pl.hp<=0){playerDie();return}}}
 }
 function explodeEnemy(b){
   const R=GUNS[2].radius;explosionFx(b.x,b.y,R);if(pl&&Math.hypot(b.x-pl.x,b.y-pl.y)<1200){sfx.boom();shake=Math.max(shake,5)}
@@ -667,7 +848,7 @@ function animCreature(e,dt){
   if(rollers(e.t)){
     // swimming at the player: point the bell (or the claws) straight at them; on the sand or drifting, sit upright
     e.tilt=0;let tr=0;
-    if(!e.dead&&isAggro(e)&&(e.t==='jelly'||e.y<floorY(e.x)-30)){const tp=(!e.mirror&&e.tgt)?playerById(e.tgt):nearestPlayer(e);if(tp)tr=Math.atan2(tp.y-e.y,tp.x-e.x)+Math.PI/2}
+    if(!e.dead&&isAggro(e)&&(s.jel||e.y<floorY(e.x,e.z)-30)){const tp=(!e.mirror&&e.tgt)?playerById(e.tgt):nearestPlayer(e);if(tp)tr=Math.atan2(tp.y-e.y,tp.x-e.x)+Math.PI/2}
     e.rot=lerpAngle(e.rot,tr,Math.min(1,dt*5));return}
   if(e.st!=='windup'&&!e.mirror&&Math.abs(e.vx)>6)e.face=e.vx<0?-1:1;
   const tt=clamp(Math.atan2(e.vy,Math.abs(e.vx)+1),-s.tiltMax,s.tiltMax);e.tilt+=(tt-e.tilt)*Math.min(1,dt*4);
@@ -675,7 +856,7 @@ function animCreature(e,dt){
 function separate(){
   for(let i=0;i<creatures.length;i++){const a=creatures[i];if(a.dead||a.mirror||a.t==='crab')continue;
     for(let j=i+1;j<creatures.length;j++){const b=creatures[j];if(b.dead||b.mirror||b.t!==a.t)continue;
-      const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),m=SP[a.t].C[0][2]*2.4+(a.t==='whale'?200:a.t==='orca'?90:a.t==='shark'?60:0);
+      const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy),m=SP[a.t].C[0][2]*2.4+({whale:200,sperm:240,squid:130,orca:90,shark:60,swallow:50,viper:40}[a.t]||0);
       if(d>0&&d<m){const p=(m-d)*.02;a.x-=dx/d*p;a.y-=dy/d*p;b.x+=dx/d*p;b.y+=dy/d*p}}}
 }
 
@@ -686,10 +867,11 @@ function hurtCreature(e,dmg,src){
   if(!e.mirror){e.hp-=dmg;aggro(e,src);if(SP[e.t].rage&&!e.rage){e.rage=true;e.cd=Math.min(e.cd,.2)}if(e.hp<=0)killCreature(e)}
   else{e.hp=Math.max(1,e.hp-dmg);NET.hacc.set(e.id,(NET.hacc.get(e.id)||0)+dmg)}
 }
-function killCreature(e){killFx(e);if(NET.active&&NET.host)NET.out.G.push(mkSeq([e.id,ORDER.indexOf(e.t),Math.round(e.x),Math.round(e.y)]))}
+function killCreature(e){killFx(e);if(NET.active&&NET.host)NET.out.G.push(mkSeq([e.id,ORDER.indexOf(e.t),Math.round(e.x),Math.round(e.y),e.z]))}
 function killFx(e){
-  if(e.dead)return;e.dead=true;e.deadT=0;e.hp=0;const s=SP[e.t],big=ORDER.indexOf(e.t)>=4;
-  blobs(e.x,e.y,8+ORDER.indexOf(e.t)*3,s.col,s.C[0][2]+10,big?10:6);blobs(e.x,e.y,6,INK,s.C[0][2],5);bubbles(e.x,e.y,10+ORDER.indexOf(e.t)*3,70);
+  if(e.dead)return;e.dead=true;e.deadT=0;e.hp=0;const s=SP[e.t],rk=s.rank+s.z*2,big=rk>=4;
+  if(e.z!==zone)return; // a death the host saw in the other zone: nothing to show or pick up here
+  blobs(e.x,e.y,8+rk*3,s.col,s.C[0][2]+10,big?10:6);blobs(e.x,e.y,6,INK,s.C[0][2],5);bubbles(e.x,e.y,10+rk*3,70);
   if(state!=='title'){sfx.kill(big);if(big)shake=Math.max(shake,8)}
   if(T-e.lastHitMe<6&&state!=='title'){kills++;killsBy[e.t]++}
   if(state!=='title')spawnDrops(e.t,e.x,e.y);
@@ -698,65 +880,109 @@ function spawnDrops(t,x,y){const[a,b]=SP[t].drop;const n=ri(a,b);for(let i=0;i<n
 
 // ---- spawning (host / single player only)
 const spawnW=t=>SP[t].w*(BIG.has(t)?DM():1);
-function pickSpecies(){let tot=0;for(const t of ORDER)tot+=spawnW(t);let r=Math.random()*tot;for(const t of ORDER){r-=spawnW(t);if(r<=0)return t}return'jelly'}
-function band(t,x){const f=floorY(x);switch(t){case'jelly':return[TOP+260,f-260];case'crab':return[f-16,f-16];case'turtle':return[f-1300,f-110];case'sword':return[f-1900,f-180];
-  case'shark':return[f-1700,f-200];case'orca':return[f-1900,f-280];default:return[TOP+500,f-420]}}
-function refs(){const l=players();return l.length?l:[{x:cam.x,y:cam.y}]}
+function pickSpecies(z){const l=ZSP[z];let tot=0;for(const t of l)tot+=spawnW(t);let r=Math.random()*tot;for(const t of l){r-=spawnW(t);if(r<=0)return t}return l[0]}
+// the depth range each species keeps to
+function band(t,x,z){const f=floorY(x,z),top=ZT(z);switch(t){
+  case'jelly':return[top+260,f-260];case'crab':return[f-16,f-16];case'turtle':return[f-1300,f-110];case'sword':return[f-1900,f-180];
+  case'shark':return[f-1700,f-200];case'orca':return[f-1900,f-280];case'whale':return[top+500,f-420];
+  case'djelly':return[top+300,f-300];case'bristle':return[top+300,f-400];case'viper':return[f-4800,f-200];case'swallow':return[f-4200,f-200];
+  case'squid':return[f-5200,f-400];default:return[top+600,f-600]}}
+// where to spawn around: the fish in that zone, or the drifting title camera
+function refs(z){const l=players(z);return l.length?l:z===0&&state==='title'?[{x:cam.x,y:cam.y}]:[]}
 function minDist(x,y,l){let m=1e9;for(const p of l)m=Math.min(m,Math.hypot(p.x-x,p.y-y));return m}
-function spawnGroup(near){
-  const R=refs();let t=pickSpecies();
-  const n=players().length||1,count=t=>creatures.filter(c=>!c.dead&&c.t===t).length;
+function spawnGroup(near,z=0){
+  const R=refs(z);if(!R.length)return;let t=pickSpecies(z);
+  const P=players(z),n=P.length||1,count=t=>creatures.filter(c=>!c.dead&&c.t===t).length;
   if(t==='whale'&&count('whale')>=Math.max(1,Math.round((1+Math.floor(n/3))*DM())))t='shark';
   if(t==='orca'&&count('orca')>=Math.round((2+n)*DM()))t='turtle';
+  if(t==='sperm'&&count('sperm')>=Math.max(1,Math.round((1+Math.floor(n/3))*DM())))t='swallow';
+  if(t==='squid'&&count('squid')>=Math.round((1+n)*DM()))t='viper';
   const ref=R[(Math.random()*R.length)|0];
   for(let tries=0;tries<14;tries++){
     const side=Math.random()<.5?-1:1,x=clamp(ref.x+side*rand(near?700:1150,near?2000:2300),200,WW-200);
-    const[b0,b1]=band(t,x),y=clamp(ref.y+rand(-650,650),Math.min(b0,b1),Math.max(b0,b1));
+    const[b0,b1]=band(t,x,z),y=clamp(ref.y+rand(-650,650),Math.min(b0,b1),Math.max(b0,b1));
     if(!near&&state!=='title'&&minDist(x,y,R)<1000)continue;
-    if(players().length&&minDist(x,y,players())<700)continue;
+    if(P.length&&minDist(x,y,P)<700)continue;
     const g=gid++,[g0,g1]=SP[t].g,k=ri(g0,g1);
-    for(let i=0;i<k;i++){const ox=t==='crab'?rand(-90,90):rand(-80,80),e=mkCreature(t,clamp(x+ox,100,WW-100),y+(t==='crab'?0:rand(-60,60)),g);if(t==='crab')e.y=floorY(e.x)-16;creatures.push(e)}
+    for(let i=0;i<k;i++){const ox=t==='crab'?rand(-90,90):rand(-80,80),e=mkCreature(t,clamp(x+ox,100,WW-100),y+(t==='crab'?0:rand(-60,60)),g,z);if(t==='crab')e.y=floorY(e.x,z)-16;creatures.push(e)}
     return;
   }
 }
+// each zone with fish in it keeps its own population; a zone nobody is in empties out
 function spawner(dt){
   if(NET.active&&NET.mode==='pvp')return; // PvP: just fish
-  const n=Math.max(1,players().length),target=state==='title'?26:24+9*(n-1);
-  const R=refs();
-  for(const e of creatures)if(!e.dead&&!e.mirror&&!e.tgt&&minDist(e.x,e.y,R)>2900){e.dead=true;e.deadT=9;e.gone=true}
-  spawnT-=dt;if(spawnT<=0){spawnT=.9;if(creatures.filter(e=>!e.dead).length<target)spawnGroup(false)}
+  spawnT-=dt;const due=spawnT<=0;if(due)spawnT=.9;
+  for(const z of[0,1]){
+    const R=refs(z),n=Math.max(1,players(z).length),target=state==='title'?26:24+9*(n-1);
+    for(const e of creatures)if(e.z===z&&!e.dead&&!e.mirror&&!e.tgt&&(!R.length||minDist(e.x,e.y,R)>2900)){e.dead=true;e.deadT=9;e.gone=true}
+    if(due&&R.length&&creatures.filter(e=>!e.dead&&e.z===z).length<target)spawnGroup(false,z);
+  }
 }
 
 // ===================================================================== player
 function shoot(){
-  const g=GUNS[tier],m=muzzle(pl,tier),a=pl.aim+rand(-(g.spread||0),g.spread||0);
+  const g=GUNS[tier],m=muzzle(pl,tier),sp=g.kind==='bubble'?0:(g.spread||0),a=pl.aim+rand(-sp,sp);
   addShot(m.x,m.y,a,tier,true,pl.vx*.25,pl.vy*.25);
-  if(NET.active&&NET.started)NET.out.S.push(mkSeq([Math.round(m.x),Math.round(m.y),r2(a),tier]));
-  pl.vx-=Math.cos(a)*(tier===2?90:18);pl.vy-=Math.sin(a)*(tier===2?90:18);
-  if(tier===2)sfx.rocket();else sfx.shot(tier);
-  bubbles(m.x,m.y,tier===2?5:1,30);
+  if(NET.active&&NET.started)NET.out.S.push(mkSeq([Math.round(m.x),Math.round(m.y),r2(a),tier,zone]));
+  const kick={2:90,4:60,6:70}[tier]||18;pl.vx-=Math.cos(a)*kick;pl.vy-=Math.sin(a)*kick;
+  const k=g.kind;if(k==='rocket')sfx.rocket();else if(k==='bubble')sfx.bubble(1);else if(k==='light')sfx.light(1);else if(k==='teeth')sfx.teeth();else sfx.shot(tier);
+  bubbles(m.x,m.y,tier===2?5:k==='bubble'?8:1,30);
 }
+// one trigger pull: a bullet, a rocket, a streak of light, a spray of bubbles or a row of teeth
 function addShot(x,y,a,t,own,ivx=0,ivy=0){
   const g=GUNS[t];if(g.kind==='laser')return;
-  const s=g.speed*BS();
-  proj.push({k:g.kind,x,y,px:x,py:y,vx:Math.cos(a)*s+ivx,vy:Math.sin(a)*s+ivy,a,t,own,trav:0,range:g.range});
+  const s=g.speed*BS(),base={x,y,px:x,py:y,a,t,own,trav:0,range:g.range,dmg:g.dmg,pierce:g.pierce||0};
+  if(g.kind==='bubble'){for(let i=0;i<g.pellets;i++){const aa=a+rand(-g.spread,g.spread),ss=s*rand(.55,1.1);
+      proj.push({...base,k:'bubble',vx:Math.cos(aa)*ss+ivx,vy:Math.sin(aa)*ss+ivy,r:rand(6,11),life:rand(.6,.95),ph:rand(0,TAU)})}
+    part({k:'flash',x,y,r:14,life:.08,max:.08});return}
+  if(g.kind==='teeth'){const nx=-Math.sin(a),ny=Math.cos(a);for(let i=-2;i<=2;i++){const ox=nx*i*11,oy=ny*i*11;
+      proj.push({...base,k:'tooth',x:x+ox,y:y+oy,px:x+ox,py:y+oy,vx:Math.cos(a)*s+ivx,vy:Math.sin(a)*s+ivy})}return}
+  proj.push({...base,k:g.kind,vx:Math.cos(a)*s+ivx,vy:Math.sin(a)*s+ivy,hue:rand(0,360)});
   if(g.kind!=='rocket')part({k:'flash',x,y,r:9,life:.06,max:.06});
 }
-function laserBeam(p,t){const m=muzzle(p,t),L=GUNS[3].range,dx=Math.cos(p.aim),dy=Math.sin(p.aim);let len=L;
-  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x)+4||y<TOP-200){len=s;break}}
+function laserBeam(p,t){const z=p.z|0,m=muzzle(p,t),L=GUNS[t].range,dx=Math.cos(p.aim),dy=Math.sin(p.aim);let len=L;
+  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x,z)+4||y<ZT(z)-200||wallHit(x,y,z)){len=s;break}}
   return{x1:m.x,y1:m.y,x2:m.x+dx*len,y2:m.y+dy*len}}
 function segCircle(x1,y1,x2,y2,cx_,cy_,r){const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;let t=l2?((cx_-x1)*dx+(cy_-y1)*dy)/l2:0;t=clamp(t,0,1);const px=x1+dx*t,py=y1+dy*t;return(px-cx_)**2+(py-cy_)**2<=r*r?t:-1}
 function laserTick(dt){
-  const b=laserBeam(pl,3);
-  for(const e of creatures){if(e.dead)continue;let hit=-1;for(const c of circlesOf(e)){const t=segCircle(b.x1,b.y1,b.x2,b.y2,c[0],c[1],c[2]);if(t>=0&&(hit<0||t<hit))hit=t}
-    if(hit>=0){hurtCreature(e,GUNS[3].dps*dt,'me');if(Math.random()<dt*25)sparks(lerp(b.x1,b.x2,hit),lerp(b.y1,b.y2,hit),2,'#ff9a8a')}}
-  if(pvpOn())for(const r of liveRemotes()){const t=segCircle(b.x1,b.y1,b.x2,b.y2,r.x,r.y,FISH_R);if(t>=0){hurtRemote(r,GUNS[3].dps*dt);if(Math.random()<dt*25)sparks(r.x,r.y,2,'#ff9a8a')}}
+  const g=GUNS[tier],b=laserBeam(pl,tier),w=g.bw||0,spk=tier===7?mix(COLORS[selColor].c,'#ffffff',.5):'#ff9a8a';
+  for(const e of creatures){if(e.dead||e.z!==zone)continue;let hit=-1;for(const c of circlesOf(e)){const t=segCircle(b.x1,b.y1,b.x2,b.y2,c[0],c[1],c[2]+w);if(t>=0&&(hit<0||t<hit))hit=t}
+    if(hit>=0){hurtCreature(e,g.dps*dt,'me');if(Math.random()<dt*25)sparks(lerp(b.x1,b.x2,hit),lerp(b.y1,b.y2,hit),2,spk)}}
+  if(pvpOn())for(const r of liveRemotes()){const t=segCircle(b.x1,b.y1,b.x2,b.y2,r.x,r.y,FISH_R+w);if(t>=0){hurtRemote(r,g.dps*dt);if(Math.random()<dt*25)sparks(r.x,r.y,2,spk)}}
+  // the cracked rock in the Sunlit Zone's east wall gives way to a laser held on it
+  if(zone===0&&!breachOpen()&&b.x2>WW-70&&inGap(b.y2,0)){breachHp-=g.dps*dt;shake=Math.max(shake,2);
+    if(Math.random()<dt*30)sparks(b.x2,b.y2,3,'#ffcf8a');if(Math.random()<dt*8)blobs(b.x2,b.y2,1,'#5e6470',6,4);if(breachHp<=0)doBreach()}
   if(Math.random()<dt*20)bubbles(b.x2,b.y2,1,40);
+}
+// ---- the way down. A cracked stretch of the Sunlit Zone's east wall, near the seabed, breaks under a laser.
+// Past it, a tunnel leads to the Twilight Zone, whose west wall has a tunnel back. Once anyone in a room breaks
+// the wall it stays open for everyone.
+const BREACH_HP=1500;let breached=false,breachHp=BREACH_HP,twilightSeen=false,zoneBanner=0,breachHinted=false;
+function openRange(z){if(z===0){const f=floorY(WW-40,0);return[f-560,f-140]}return[640,1120]}
+function inGap(y,z){const[o0,o1]=openRange(z);return y>o0&&y<o1}
+function breachOpen(){if(breached)return true;if(NET.active&&NET.started)for(const r of NET.remotes.values())if(r.br)return true;return false}
+function wallHit(x,y,z){if(x>WW-30)return!(z===0&&breachOpen()&&inGap(y,0));if(x<30)return!(z===1&&inGap(y,1));return false}
+function doBreach(){
+  breached=true;breachHp=0;const[o0,o1]=openRange(0),y=(o0+o1)/2;
+  explosionFx(WW-30,y,220);for(let i=0;i<5;i++)explosionFx(WW-30+rand(-20,20),rand(o0,o1),120);blobs(WW-40,y,30,'#5e6470',140,12);bubbles(WW-40,y,40,120);
+  shake=18;sfx.breach();toast('You blasted through the wall. The Twilight Zone lies beyond. Swim east.','#7fd8ff');
+}
+function breachHint(){if(breachHinted||zone!==0||breachOpen()||!isLaser(tier))return;breachHinted=true;
+  toast('The east wall is cracked near the seabed. Hold a laser on it to break through.','#7fd8ff')}
+function enterZone(z){
+  zone=z;pl.z=z;proj=[];drops=[];parts=[];laserSound(false);
+  const[o0,o1]=openRange(z),y=(o0+o1)/2;
+  if(z===1){pl.x=110;pl.y=y;pl.vx=Math.max(pl.vx,220)}else{pl.x=WW-110;pl.y=y;pl.vx=Math.min(pl.vx,-220)}
+  pl.inv=Math.max(pl.inv,1.2);cam.x=pl.x;cam.y=pl.y;zoneBanner=4;sfx.zone();
+  // single player keeps only the zone you're in; a host keeps both while anyone is in each
+  if(!NET.active)creatures=creatures.filter(e=>e.z===z);
+  if(!NET.active||NET.host){if(!creatures.some(e=>e.z===z&&!e.dead))seedCreatures(12,z)}
+  if(z===1&&!twilightSeen){twilightSeen=true;refreshBag(true);toast('New creatures, new parts, new guns. Press E to see what Twilight parts can build.','#7fd8ff')}
 }
 // ---- player vs player. The shooter's page decides what it hit and tells the victim, who applies the damage to itself.
 const PVP_DMG=.6,FISH_R=16;let pvpKills=0,lastKiller=null;
 const pvpOn=()=>NET.active&&NET.started&&NET.mode!=='coop';
-function liveRemotes(){const l=[];for(const r of NET.remotes.values())if(r.alive&&r.init)l.push(r);return l}
+function liveRemotes(){const l=[];for(const r of NET.remotes.values())if(r.alive&&r.init&&r.z===zone)l.push(r);return l}
 function hurtRemote(r,dmg){NET.dacc.set(r.id,(NET.dacc.get(r.id)||0)+dmg*PVP_DMG)}
 function nameOf(peer){return peer===NET.me?(NET.nick||'You'):(NET.remotes.get(peer)||{}).nk||'Someone'}
 function updPlayer(dt,input){
@@ -780,8 +1006,14 @@ function updPlayer(dt,input){
   if(p.dashT>0){if(Math.random()<dt*60)part({k:"ghost",x:p.x,y:p.y,face:p.face,tilt:p.tilt,aim:p.aim,tail:p.tail,life:.22,max:.22})}
   else{const drag=Math.exp(-(Math.hypot(ix,iy)>.1?1.2:2.8)*dt);p.vx*=drag;p.vy*=drag}
   p.x+=p.vx*dt;p.y+=p.vy*dt;
-  if(p.x<60){p.x=60;p.vx=0}if(p.x>WW-60){p.x=WW-60;p.vx=0}
-  if(p.y<TOP){p.y=TOP;p.vy=Math.max(0,p.vy);if(Math.random()<dt*3)toast('The surface is too far up. Your fish turns back.','#9fb9c6',true)}
+  // the side walls, with a tunnel where the wall is open; inside a tunnel the fish stays between its roof and floor
+  const tun=zone===0?p.x>WW-60:p.x<60;
+  if(zone===0){const right=breachOpen()&&inGap(p.y,0)?WW+200:WW-60;if(p.x<60){p.x=60;p.vx=0}if(p.x>right){p.x=right;p.vx=0}}
+  else{const left=inGap(p.y,1)?-200:60;if(p.x<left){p.x=left;p.vx=0}if(p.x>WW-60){p.x=WW-60;p.vx=0}}
+  if(tun){const[o0,o1]=openRange(zone);if(p.y<o0+18){p.y=o0+18;p.vy=Math.max(0,p.vy)}if(p.y>o1-18){p.y=o1-18;p.vy=Math.min(0,p.vy)}}
+  if(zone===0&&p.x>WW+90){enterZone(1);return}
+  if(zone===1&&p.x<-90){enterZone(0);return}
+  if(p.y<ZT(zone)){p.y=ZT(zone);p.vy=Math.max(0,p.vy);if(Math.random()<dt*3)toast(zone?'The light above is too far to follow. The tunnel back to the Sunlit Zone is on the west wall.':'The surface is too far up. Your fish turns back.','#9fb9c6',true)}
   const fl=floorY(p.x)-16;if(p.y>fl){p.y=fl;p.vy=Math.min(0,p.vy)}
   const c=Math.cos(p.aim);if(c>.08)p.face=1;else if(c<-.08)p.face=-1;
   p.tilt+=(clamp(p.vy/900,-.22,.22)*p.face-p.tilt)*Math.min(1,dt*6);
@@ -815,8 +1047,8 @@ function playerDie(killer){
 }
 function contactCheck(){
   if(!pl||!pl.alive||pl.inv>0||pl.dashT>0)return;
-  for(const e of creatures){if(e.dead)continue;
-    const jelly=e.t==='jelly',danger=jelly?isAggro(e)&&e.sting<=0:e.st==='lunge'&&e.lastAcHit!==e.ac;if(!danger)continue;
+  for(const e of creatures){if(e.dead||e.z!==zone)continue;
+    const jelly=!!SP[e.t].jel,danger=jelly?isAggro(e)&&e.sting<=0:e.st==='lunge'&&e.lastAcHit!==e.ac;if(!danger)continue;
     // also test halfway back along this frame's move, so a lunging swordfish can't skip past the fish
     const hx=(e.px-e.x)/2,hy=(e.py-e.y)/2;
     for(const c of circlesOf(e))if(Math.hypot(c[0]-pl.x,c[1]-pl.y)<c[2]+14||Math.hypot(c[0]+hx-pl.x,c[1]+hy-pl.y)<c[2]+14){damagePlayer(Math.round(SP[e.t].dmg*DM()),e,!jelly);if(jelly)e.sting=1;else e.lastAcHit=e.ac;return}
@@ -827,28 +1059,40 @@ function contactCheck(){
 function updProj(dt){
   for(const b of proj){
     if(b.k==='rocket'||b.k==='erocket'){const g=GUNS[2],sp=Math.hypot(b.vx,b.vy),ns=Math.min(g.vmax*BS(),sp+g.accel*BS()*dt);b.vx*=ns/sp;b.vy*=ns/sp;if(Math.random()<dt*40)part({k:'puff',x:b.x-b.vx*.02,y:b.y-b.vy*.02,vx:rand(-10,10),vy:rand(-25,-5),r:rand(4,8),life:.7,max:.7,c:'#c7d3dc'})}
+    // bubbles slow down, wobble and pop on their own
+    if(b.k==='bubble'||b.st==='bubble'){const k=Math.exp(-1.5*dt);b.vx*=k;b.vy=b.vy*k-40*dt;b.ph+=dt*9;b.life-=dt;if(b.life<=0){bubbles(b.x,b.y,2,20);b.dead=true;continue}}
     b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.trav+=Math.hypot(b.vx,b.vy)*dt;
+    const gone=b.y>floorY(b.x)||b.trav>b.range||b.y<ZT(zone)-300||wallHit(b.x,b.y,zone);
     if(b.k==='erocket'){
-      if((pl&&pl.alive&&state!=="title"&&segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,45)>=0)||b.y>floorY(b.x)||b.trav>b.range||b.y<TOP-300){explodeEnemy(b);b.dead=true}
+      if((pl&&pl.alive&&state!=="title"&&segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,45)>=0)||gone){explodeEnemy(b);b.dead=true}
       continue}
     if(b.k==='ebullet'){
-      // creatures' bullets only hurt this page's own fish; every page runs its own copy
-      if(pl&&pl.alive&&pl.dashT<=0&&state!=="title"&&segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,15)>=0){damagePlayer(b.dmg,{x:b.px,y:b.py});sparks(b.x,b.y,4,'#ff8a70');b.dead=true;continue}
-      if(b.y>floorY(b.x)||b.trav>b.range||b.y<TOP-300){bubbles(b.x,b.y,2,30);b.dead=true}
+      // creatures' shots only hurt this page's own fish; every page runs its own copy
+      if(pl&&pl.alive&&pl.dashT<=0&&state!=="title"&&segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,15+(b.r||0))>=0){damagePlayer(b.dmg,{x:b.px,y:b.py});sparks(b.x,b.y,4,b.st==='light'?`hsl(${b.hue},100%,70%)`:'#ff8a70');b.dead=true;continue}
+      if(gone){bubbles(b.x,b.y,2,30);b.dead=true}
       continue}
-    let hitE=null,hitR=null,ht=2;
-    for(const e of creatures){if(e.dead)continue;for(const c of circlesOf(e)){const t=segCircle(b.px,b.py,b.x,b.y,c[0],c[1],c[2]);if(t>=0&&t<ht){ht=t;hitE=e}}}
-    if(pvpOn()){
-      if(b.own){for(const r of liveRemotes()){const t=segCircle(b.px,b.py,b.x,b.y,r.x,r.y,FISH_R);if(t>=0&&t<ht){ht=t;hitR=r;hitE=null}}}
-      else if(pl&&pl.alive){const t=segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,FISH_R);if(t>=0&&t<ht){ht=t;hitR=pl;hitE=null}} // another fish's shot stops on you (they apply the damage)
+    // player shots: light and teeth pierce through several creatures, skipping ones they already hit
+    const rad=b.k==='bubble'?b.r:0;let guard=0;
+    while(guard++<6&&!b.dead){
+      let hitE=null,hitR=null,ht=2;
+      for(const e of creatures){if(e.dead||e.z!==zone||(b.hit&&b.hit.has(e.id)))continue;for(const c of circlesOf(e)){const t=segCircle(b.px,b.py,b.x,b.y,c[0],c[1],c[2]+rad);if(t>=0&&t<ht){ht=t;hitE=e}}}
+      if(pvpOn()){
+        if(b.own){for(const r of liveRemotes()){const t=segCircle(b.px,b.py,b.x,b.y,r.x,r.y,FISH_R+rad);if(t>=0&&t<ht){ht=t;hitR=r;hitE=null}}}
+        else if(pl&&pl.alive){const t=segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,FISH_R+rad);if(t>=0&&t<ht){ht=t;hitR=pl;hitE=null}} // another fish's shot stops on you (they apply the damage)
+      }
+      if(hitR){b.x=lerp(b.px,b.x,ht);b.y=lerp(b.py,b.y,ht);
+        if(b.k==='rocket')explode(b,null,hitR);else{if(b.own){hurtRemote(hitR,b.dmg);sfx.hit()}sparks(b.x,b.y,5,'#ffffff')}
+        b.dead=true;break}
+      if(!hitE)break;
+      const hx=lerp(b.px,b.x,ht),hy=lerp(b.py,b.y,ht);
+      if(b.k==='rocket'){b.x=hx;b.y=hy;explode(b,hitE);b.dead=true;break}
+      if(b.own){hurtCreature(hitE,b.dmg,'me');sfx.hit()}
+      if(b.k==='bubble')bubbles(hx,hy,3,40);else sparks(hx,hy,4,b.k==='light'?`hsl(${b.hue},100%,70%)`:b.k==='tooth'?'#fffaf0':'#ffe9a8');
+      if(b.pierce>0){b.pierce--;(b.hit||(b.hit=new Set())).add(hitE.id);continue}
+      b.x=hx;b.y=hy;b.dead=true;
     }
-    if(hitR){b.x=lerp(b.px,b.x,ht);b.y=lerp(b.py,b.y,ht);
-      if(b.k==='rocket')explode(b,null,hitR);else{if(b.own){hurtRemote(hitR,GUNS[b.t].dmg);sfx.hit()}sparks(b.x,b.y,5,'#ffffff')}
-      b.dead=true;continue}
-    if(hitE){b.x=lerp(b.px,b.x,ht);b.y=lerp(b.py,b.y,ht);
-      if(b.k==='rocket')explode(b,hitE);else{if(b.own){hurtCreature(hitE,GUNS[b.t].dmg,'me');sfx.hit()}sparks(b.x,b.y,4)}
-      b.dead=true;continue}
-    if(b.y>floorY(b.x)||b.trav>b.range||b.y<TOP-300){if(b.k==='rocket')explode(b,null);else bubbles(b.x,b.y,2,30);b.dead=true}
+    if(b.dead)continue;
+    if(gone){if(b.k==='rocket')explode(b,null);else bubbles(b.x,b.y,2,30);b.dead=true}
   }
   proj=proj.filter(b=>!b.dead);
 }
@@ -858,7 +1102,7 @@ function explode(b,direct,directR){
   if(direct)hurtCreature(direct,g.dmg,'me');
   if(pvpOn()){if(directR&&directR!==pl)hurtRemote(directR,g.dmg);
     for(const r of liveRemotes()){const md=Math.hypot(r.x-b.x,r.y-b.y)-FISH_R;if(md<g.radius)hurtRemote(r,g.splash*(1-.5*Math.max(0,md)/g.radius))}}
-  for(const e of creatures){if(e.dead)continue;let md=1e9;for(const c of circlesOf(e))md=Math.min(md,Math.hypot(c[0]-b.x,c[1]-b.y)-c[2]);
+  for(const e of creatures){if(e.dead||e.z!==zone)continue;let md=1e9;for(const c of circlesOf(e))md=Math.min(md,Math.hypot(c[0]-b.x,c[1]-b.y)-c[2]);
     if(md<g.radius)hurtCreature(e,g.splash*(1-.5*Math.max(0,md)/g.radius),'me')}
 }
 function updDrops(dt){
@@ -885,13 +1129,13 @@ function updParts(dt){
 }
 
 // ===================================================================== upgrades
-function canUpgrade(){if(tier>=3)return false;const c=GUNS[tier+1].cost;for(const t in c)if(bag[t]<c[t])return false;return true}
-function doUpgrade(){if(!canUpgrade())return;const c=GUNS[tier+1].cost;for(const t in c)bag[t]-=c[t];tier++;sfx.up();toast(`${GUNS[tier].name} equipped`,'#ffb43d');renderBench();refreshBag(true)}
+function canUpgrade(){if(tier>=GUNS.length-1)return false;const c=GUNS[tier+1].cost;for(const t in c)if(bag[t]<c[t])return false;return true}
+function doUpgrade(){if(!canUpgrade())return;const c=GUNS[tier+1].cost;for(const t in c)bag[t]-=c[t];tier++;sfx.up();toast(`${GUNS[tier].name} equipped`,'#ffb43d');renderBench();refreshBag(true);breachHint()}
 function renderBench(){
   const box=$('tiers');box.textContent='';
   GUNS.forEach((g,i)=>{
     const d=document.createElement('div');d.className='tier '+(i<=tier?'owned':i===tier+1?'next':'locked');
-    const cv=document.createElement('canvas');cv.width=380;cv.height=140;const k=cv.getContext('2d'),o=cx;cx=k;k.translate(190-[7,12,6,14][i]*2.8,70);k.scale(2.8,2.8);drawGun(i,false);cx=o;
+    const cv=document.createElement('canvas');cv.width=380;cv.height=140;const k=cv.getContext('2d'),o=cx;cx=k;k.translate(190-[7,12,6,14,12,15,14,20][i]*2.8,70);k.scale(2.8,2.8);drawGun(i,false,COLORS[selColor].c);cx=o;
     const h=document.createElement('h3');h.textContent=g.name;
     const st=document.createElement('div');st.className='state';st.textContent=i===tier?'Equipped':i<tier?'Replaced':'';
     const p=document.createElement('p');p.textContent=g.desc;
@@ -902,7 +1146,9 @@ function renderBench(){
       if(i===tier+1){const b=document.createElement('button');b.className='btn'+(canUpgrade()?' big':'');b.type='button';b.id='do-up';b.disabled=!canUpgrade();b.textContent=canUpgrade()?'Upgrade':'Not enough parts';b.addEventListener('click',doUpgrade);d.append(b)}}
     box.append(d);
   });
+  // the note under the title says how the next guns are earned
   $('bench-note').textContent=NET.active&&NET.mode==='pvp'?'There are no creatures in PvP. Every fish you blast upgrades your gun one step.':NET.active?'The ocean keeps moving while you shop. Each gun replaces the last.':'The game is paused while you shop. Each gun replaces the last.';
+  if(!(NET.active&&NET.mode==='pvp')&&tier>=2&&!twilightSeen)$('bench-note').textContent+=' The last four guns need parts from the Twilight Zone, past the cracked east wall.';
 }
 function openBench(){if(state!=='play')return;state='bench';renderBench();$('bench').hidden=false;mouse.down=false;laserSound(false)}
 function closeBench(){if(state!=='bench')return;state='play';$('bench').hidden=true;cvs.focus()}
@@ -911,7 +1157,9 @@ function closeBench(){if(state!=='bench')return;state='play';$('bench').hidden=t
 const bagEls={};
 function buildBag(){const b=$('bag');b.textContent='';for(const t of ORDER){const s=document.createElement('span');s.className='slot zero';s.title=SP[t].part;const n=document.createElement('b');n.textContent='0';s.append(partIcon(t),n);b.append(s);bagEls[t]={s,n,v:-1}}}
 function popSlot(t){const el=bagEls[t];if(!el)return;el.s.classList.remove('pop');void el.s.offsetWidth;el.s.classList.add('pop')}
-function refreshBag(force){for(const t of ORDER){const el=bagEls[t];if(force||el.v!==bag[t]){el.v=bag[t];el.n.textContent=bag[t];el.s.classList.toggle('zero',!bag[t])}}}
+// Twilight part slots stay hidden until you reach the Twilight Zone (or hold one)
+function refreshBag(force){for(const t of ORDER){const el=bagEls[t];if(force||el.v!==bag[t]){el.v=bag[t];el.n.textContent=bag[t];el.s.classList.toggle('zero',!bag[t])}
+  const h=SP[t].z===1&&!twilightSeen&&!bag[t];if(el.s.hidden!==h)el.s.hidden=h}}
 let hudSig='';
 function updHud(){
   if(!pl)return;
@@ -931,9 +1179,10 @@ function toast(msg,col,quiet){if(quiet&&msg===lastToastMsg&&T-lastToastT<6)retur
 // ===================================================================== runs
 function resetRun(){
   creatures=[];proj=[];parts=[];drops=[];tier=0;bag=emptyBag();killsBy=emptyBag();kills=0;runTime=0;hudSig='';spawnT=0;
+  zone=0;breached=false;breachHp=BREACH_HP;twilightSeen=false;breachHinted=false;zoneBanner=0;
   pl=newPlayer();cam.x=pl.x;cam.y=pl.y;NET.mirrors=new Map();refreshBag(true);
 }
-function seedCreatures(n){for(let i=0;i<n;i++)spawnGroup(false)}
+function seedCreatures(n,z=0){for(let i=0;i<n;i++)spawnGroup(false,z)}
 function showHud(){$('hud').hidden=false;const h=$('hint');h.hidden=false;h.style.opacity=1;setTimeout(()=>h.style.opacity=0,9000)}
 function startSP(){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
@@ -943,7 +1192,7 @@ function startSP(){
 }
 function toTitle(){
   if(NET.active)endRoom();
-  state='title';pl=null;laserSound(false);creatures=[];proj=[];drops=[];
+  state='title';pl=null;zone=0;laserSound(false);creatures=[];proj=[];drops=[];
   for(const id of['dead','pause','bench','mp'])$(id).hidden=true;$('hud').hidden=true;$('hint').hidden=true;$('title').hidden=false;seedCreatures(16);
 }
 function pause(){if(state!=='play')return;state='pause';laserSound(false);mouse.down=false;$('pause').hidden=false;
@@ -952,7 +1201,7 @@ function resume(){if(state!=='pause')return;state='play';$('pause').hidden=true;
 function showDeath(){
   state='dead';$('dead').hidden=false;$('bench').hidden=true;$('pause').hidden=true;
   const m=Math.floor(runTime/60),s=Math.floor(runTime%60);
-  const list=ORDER.filter(t=>killsBy[t]).map(t=>`${killsBy[t]} ${SP[t].name.toLowerCase()}${killsBy[t]>1&&t!=='jelly'&&t!=='sword'?'s':''}`).join(', ');
+  const list=ORDER.filter(t=>killsBy[t]).map(t=>`${killsBy[t]} ${killsBy[t]>1?NAMES_PL[t]:SP[t].name.toLowerCase()}`).join(', ');
   if(NET.active){$('dead-h').textContent=lastKiller?`${nameOf(lastKiller)} blasted you`:'You were eaten';
     $('dead-stats').textContent=NET.mode==='pvp'?`Your gun is safe. You have blasted ${pvpKills} fish so far.`:'Your gun and parts are safe. Jump back in when you are ready.';$('again').textContent='Respawn';$('d-quit').textContent='Leave room'}
   else{let best=0;const bk='finfury-best'+(diff?'-'+diff:'')+(gg?'-gg':'');try{best=+localStorage.getItem(bk)||0;if(kills>best)localStorage.setItem(bk,kills)}catch(e){}
@@ -966,8 +1215,10 @@ function respawn(){
 }
 
 // ===================================================================== rendering
-const DEPTH=[[0,[74,165,196]],[1100,[34,106,152]],[2300,[18,64,110]],[3700,[8,30,60]]];
-function depthRGB(y){if(y<=DEPTH[0][0])return DEPTH[0][1];for(let i=1;i<DEPTH.length;i++)if(y<=DEPTH[i][0]){const[a,ca]=DEPTH[i-1],[b,cb]=DEPTH[i],t=(y-a)/(b-a);return ca.map((v,k)=>Math.round(v+(cb[k]-v)*t))}return DEPTH[DEPTH.length-1][1]}
+// water colour by depth, per zone: the Twilight Zone starts dim blue and falls away to near black
+const DEPTHS=[[[0,[74,165,196]],[1100,[34,106,152]],[2300,[18,64,110]],[3700,[8,30,60]]],
+  [[0,[22,46,92]],[1500,[13,26,62]],[4000,[7,13,34]],[7400,[3,5,14]]]];
+function depthRGB(y){const D=DEPTHS[zone];if(y<=D[0][0])return D[0][1];for(let i=1;i<D.length;i++)if(y<=D[i][0]){const[a,ca]=D[i-1],[b,cb]=D[i],t=(y-a)/(b-a);return ca.map((v,k)=>Math.round(v+(cb[k]-v)*t))}return D[D.length-1][1]}
 const rgb=(c,a=1)=>`rgba(${c[0]},${c[1]},${c[2]},${a})`;
 function render(){
   const w=cvs.width,h=cvs.height;
@@ -976,6 +1227,7 @@ function render(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   // water column
   const gr=ctx.createLinearGradient(0,0,0,VH);gr.addColorStop(0,rgb(depthRGB(Math.max(0,y0))));gr.addColorStop(1,rgb(depthRGB(Math.max(0,y1))));ctx.fillStyle=gr;ctx.fillRect(0,0,VW,VH);
+  if(zone===1){renderTwilight(camx,camy,x0,x1,y0,y1);return}
   // sky and surface, visible only near the top of the world
   if(y0<40){const sY=(0-camy)*Z+VH/2;if(sY>0){const sk=ctx.createLinearGradient(0,0,0,sY);sk.addColorStop(0,'#bfe6f2');sk.addColorStop(1,'#e9f7f6');ctx.fillStyle=sk;ctx.fillRect(0,0,VW,sY)}
     ctx.beginPath();ctx.moveTo(0,sY);for(let x=0;x<=VW+20;x+=20){const wx=camx+(x-VW/2)/Z;ctx.lineTo(x,sY+Math.sin(wx*.02+T*2)*4*Z+Math.sin(wx*.007-T)*3*Z)}
@@ -995,38 +1247,67 @@ function render(){
   drawKelp(x0,x1,false);
   drawFloor(x0,x1,y1);
   drawWalls(x0,x1,y0,y1);
-  for(const d of drops)if(d.x>x0-30&&d.x<x1+30&&d.y>y0-30&&d.y<y1+30){cx.save();cx.translate(d.x,d.y+Math.sin(d.a)*3);cx.rotate(Math.sin(d.a*.7)*.3);if(d.life<5)cx.globalAlpha=(Math.sin(d.life*12)+1)/2*.7+.3;
-    cx.save();cx.globalCompositeOperation='lighter';circ(0,0,16+Math.sin(d.a*2)*2);cx.fillStyle='rgba(255,220,140,.14)';cx.fill();cx.restore();drawPart(d.t);cx.restore()}
-  const vis=creatures.filter(e=>!e.gone&&e.x>x0-300&&e.x<x1+300&&e.y>y0-250&&e.y<y1+250).sort((a,b)=>ORDER.indexOf(b.t)-ORDER.indexOf(a.t));
-  for(const e of vis)drawCreature(e);
-  for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive){if(r.laser)drawBeam(laserBeam(r,3),.8);drawFish(r,COLORS[r.cl].c,r.tier)}
-  if(pl&&pl.alive&&state!=='title'){if(pl.laser)drawBeam(laserBeam(pl,3),1);if(!(pl.inv>0&&Math.floor(T*20)%2))drawFish(pl,COLORS[selColor].c,tier)}
-  drawProj();drawParts();
+  const vis=drawActors(x0,x1,y0,y1);
   drawKelp(x0,x1,true);
   for(const e of vis)if(!e.dead&&e.hp<e.max)hpBar(e);
-  // screen space
+  drawOverlays(camx,camy,'rgba(225,240,245,.5)',.35);
+}
+// the Twilight Zone: barely any light from above, distant glowing things, vents and silt below
+function renderTwilight(camx,camy,x0,x1,y0,y1){
+  if(camy<1800){const la=clamp(1-camy/1800,0,1)*.05;ctx.save();ctx.globalCompositeOperation='lighter';
+    for(let i=0;i<5;i++){const bx=((i*523-camx*.15*Z)%(VW+600)+VW+600)%(VW+600)-300;const lg=ctx.createLinearGradient(0,0,0,VH);lg.addColorStop(0,`rgba(120,170,255,${la})`);lg.addColorStop(1,'rgba(120,170,255,0)');ctx.fillStyle=lg;
+      ctx.beginPath();ctx.moveTo(bx,0);ctx.lineTo(bx+50,0);ctx.lineTo(bx+170,VH);ctx.lineTo(bx+80,VH);ctx.closePath();ctx.fill()}ctx.restore()}
+  drawParallax(DEC1.far,.35,camx,camy,rgb(depthRGB(camy+900),1),.6,false);
+  drawParallax(DEC1.mid,.6,camx,camy,rgb(depthRGB(camy+1400),1),.75,false);
+  ctx.setTransform(DPR*Z,0,0,DPR*Z,DPR*(VW/2-camx*Z),DPR*(VH/2-camy*Z));cx=ctx;ctx.lineJoin='round';ctx.lineCap='round';
+  // drifting bioluminescent specks, the only light down here
+  for(const l of DEC1.lights){if(l.x<x0-20||l.x>x1+20||l.y<y0-20||l.y>y1+20)continue;const tw=.45+.55*Math.sin(T*1.7+l.ph);
+    const x=l.x+Math.sin(T*.4+l.ph)*12,y=l.y+Math.cos(T*.3+l.ph)*10;glow(x,y,l.s*7,l.c,.35*tw);circ(x,y,l.s*.7);cx.fillStyle=l.c;cx.globalAlpha=.8*tw;cx.fill();cx.globalAlpha=1}
+  drawFloor1(x0,x1,y1);
+  drawWalls(x0,x1,y0,y1);
+  const vis=drawActors(x0,x1,y0,y1);
+  for(const e of vis)if(!e.dead&&e.hp<e.max)hpBar(e);
+  drawOverlays(camx,camy,'rgba(160,190,255,.45)',.5);
+}
+// drops, creatures, other fish, your fish, shots and particles in this zone
+function drawActors(x0,x1,y0,y1){
+  for(const d of drops)if(d.x>x0-30&&d.x<x1+30&&d.y>y0-30&&d.y<y1+30){cx.save();cx.translate(d.x,d.y+Math.sin(d.a)*3);cx.rotate(Math.sin(d.a*.7)*.3);if(d.life<5)cx.globalAlpha=(Math.sin(d.life*12)+1)/2*.7+.3;
+    cx.save();cx.globalCompositeOperation='lighter';circ(0,0,16+Math.sin(d.a*2)*2);cx.fillStyle='rgba(255,220,140,.14)';cx.fill();cx.restore();drawPart(d.t);cx.restore()}
+  const vis=creatures.filter(e=>!e.gone&&e.z===zone&&e.x>x0-320&&e.x<x1+320&&e.y>y0-260&&e.y<y1+260).sort((a,b)=>ORDER.indexOf(b.t)-ORDER.indexOf(a.t));
+  for(const e of vis)drawCreature(e);
+  for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive&&r.z===zone){const c=COLORS[r.cl].c;if(r.laser)drawBeam(laserBeam(r,r.tier),.8,r.tier===7?c:'#e01f1f',r.tier===7?2.4:1);drawFish(r,c,r.tier)}
+  if(pl&&pl.alive&&state!=='title'){const c=COLORS[selColor].c;if(pl.laser)drawBeam(laserBeam(pl,tier),1,tier===7?c:'#e01f1f',tier===7?2.4:1);if(!(pl.inv>0&&Math.floor(T*20)%2))drawFish(pl,c,tier)}
+  drawProj();drawParts();
+  return vis;
+}
+// screen-space layer: names, arrows, marine snow, vignette, flashes and the zone title card
+function drawOverlays(camx,camy,snowCol,dark){
   ctx.setTransform(DPR,0,0,DPR,0,0);
-  for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive){const px=(r.x-camx)*Z+VW/2,py=(r.y-camy)*Z+VH/2-34*Z-12;ctx.font='700 13px "Alegreya Sans",sans-serif';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle=INK;ctx.strokeText(r.nk,px,py);ctx.fillStyle=COLORS[r.cl].c;ctx.fillText(r.nk,px,py);
+  for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive&&r.z===zone){const px=(r.x-camx)*Z+VW/2,py=(r.y-camy)*Z+VH/2-34*Z-12;ctx.font='700 13px "Alegreya Sans",sans-serif';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle=INK;ctx.strokeText(r.nk,px,py);ctx.fillStyle=COLORS[r.cl].c;ctx.fillText(r.nk,px,py);
     if(px<-10||px>VW+10||py<-10||py>VH+10)offscreenArrow(px,py,COLORS[r.cl].c)}
-  // marine snow
-  ctx.fillStyle='rgba(225,240,245,.5)';
+  // once you hold a laser, an arrow points the way to the cracked wall
+  if(pl&&pl.alive&&state!=='title'&&zone===0&&isLaser(tier)&&!breachOpen()){const[o0,o1]=openRange(0),px=(WW-40-camx)*Z+VW/2,py=((o0+o1)/2-camy)*Z+VH/2;
+    if(px<-10||px>VW+10||py<-10||py>VH+10)offscreenArrow(px,py,'#7fd8ff')}
+  ctx.fillStyle=snowCol;
   for(const s of DEC.snow){const x=((s.x*VW*1.2-camx*Z*s.z*.5+Math.sin(T*.3+s.ph)*20)%(VW*1.2)+VW*1.2)%(VW*1.2)-VW*.1,y=((s.y*VH*1.2-camy*Z*s.z*.5+T*8*s.z)%(VH*1.2)+VH*1.2)%(VH*1.2)-VH*.1;ctx.globalAlpha=.25+s.z*.45;ctx.beginPath();ctx.arc(x,y,s.z*1.8,0,TAU);ctx.fill()}
   ctx.globalAlpha=1;
-  // vignette and hurt flash
-  const vg=ctx.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.35,VW/2,VH/2,Math.max(VW,VH)*.75);vg.addColorStop(0,'rgba(2,6,14,0)');vg.addColorStop(1,`rgba(2,6,14,${.35+clamp(camy/FL,0,1)*.3})`);ctx.fillStyle=vg;ctx.fillRect(0,0,VW,VH);
+  const vg=ctx.createRadialGradient(VW/2,VH/2,Math.min(VW,VH)*.35,VW/2,VH/2,Math.max(VW,VH)*.75);vg.addColorStop(0,'rgba(2,6,14,0)');vg.addColorStop(1,`rgba(2,6,14,${dark+clamp(camy/ZF(zone),0,1)*.3})`);ctx.fillStyle=vg;ctx.fillRect(0,0,VW,VH);
   if(hurtFlash>0){ctx.fillStyle=`rgba(255,60,50,${hurtFlash*.5})`;ctx.fillRect(0,0,VW,VH)}
   if(pl&&pl.alive&&pl.hp<30&&state!=='title'){ctx.fillStyle=`rgba(255,40,40,${(.5+Math.sin(T*6)*.5)*.12})`;ctx.fillRect(0,0,VW,VH)}
+  if(zoneBanner>0&&state!=='title'){const Zn=ZONES[zone],a=clamp(Math.min(zoneBanner,4-zoneBanner)*1.5,0,1);ctx.save();ctx.globalAlpha=a;ctx.textAlign='center';
+    ctx.font=`800 ${Math.round(clamp(VW/20,26,46))}px Cinzel, Georgia, serif`;ctx.lineWidth=6;ctx.strokeStyle=INK;ctx.strokeText(Zn.name,VW/2,VH*.24);ctx.fillStyle=zone?'#9fd8ff':'#ffd88a';ctx.fillText(Zn.name,VW/2,VH*.24);
+    ctx.font='600 15px "Alegreya Sans",sans-serif';ctx.lineWidth=4;ctx.strokeText(Zn.sub,VW/2,VH*.24+30);ctx.fillStyle='#e9f2ef';ctx.fillText(Zn.sub,VW/2,VH*.24+30);ctx.restore()}
 }
 function offscreenArrow(px,py,col){const x=clamp(px,24,VW-24),y=clamp(py,24,VH-24),a=Math.atan2(py-VH/2,px-VW/2);ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-8,-8);ctx.lineTo(-8,8);ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=INK;ctx.stroke();ctx.restore()}
 function drawParallax(list,f,camx,camy,col,alpha,kelpy){
-  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=col;const base=(FL+80-camy)*Z*f+VH/2;
+  ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=col;const base=(ZF(zone)+80-camy)*Z*f+VH/2;
   for(const m of list){const sx=(m.x-camx*f)*Z+VW/2,ww=m.w*Z*f*2,hh=m.h*Z*f*1.4;if(sx+ww<0||sx-ww>VW)continue;
     if(kelpy&&m.kelp){ctx.beginPath();for(let i=0;i<3;i++){const ox=sx+(i-1)*ww*.3;ctx.moveTo(ox-3,base+20);ctx.quadraticCurveTo(ox+Math.sin(T*.6+i+m.x)*14,base-hh*.6,ox+Math.sin(T*.5+i)*8,base-hh);ctx.lineTo(ox+6,base-hh);ctx.quadraticCurveTo(ox+Math.sin(T*.6+i+m.x)*14+8,base-hh*.6,ox+5,base+20)}ctx.fill()}
     else{ctx.beginPath();ctx.moveTo(sx-ww,base+30);ctx.quadraticCurveTo(sx-ww*.6,base-hh*.4,sx-ww*.15,base-hh);ctx.quadraticCurveTo(sx,base-hh*1.08,sx+ww*.2,base-hh*.9);ctx.quadraticCurveTo(sx+ww*.7,base-hh*.3,sx+ww,base+30);ctx.closePath();ctx.fill()}}
   ctx.fillRect(0,base+20,VW,VH);ctx.restore();
 }
 function drawFloor(x0,x1,y1){
-  const a=Math.floor((x0-40)/24)*24,b=x1+40,bottom=Math.max(y1+40,FL+300);
+  const a=Math.floor((x0-40)/24)*24,b=x1+40,bottom=Math.max(y1+40,ZF(0)+300);
   // rocks sit half buried in the sand
   cx.lineWidth=3.4;cx.strokeStyle=INK;
   for(const r of DEC.rocks){if(r.x<x0-r.s*1.6||r.x>x1+r.s*1.6)continue;const fy=floorY(r.x)+r.s*.18;cx.beginPath();const P=r.pts;cx.moveTo(r.x+P[0][0],fy+P[0][1]);
@@ -1034,7 +1315,7 @@ function drawFloor(x0,x1,y1){
     cx.fillStyle=r.c;cx.fill();cx.stroke();cx.save();cx.clip();ell(r.x-r.s*.3,fy-r.s*.45,r.s*.5,r.s*.16,-.2);cx.fillStyle='rgba(255,255,255,.12)';cx.fill();cx.restore()}
   // coral
   for(const c of DEC.coral){if(c.x<x0-60||c.x>x1+60)continue;drawCoral(c)}
-  const sg=cx.createLinearGradient(0,FL-140,0,FL+260);sg.addColorStop(0,'#dcc38a');sg.addColorStop(1,'#8f7448');
+  const sg=cx.createLinearGradient(0,ZF(0)-140,0,ZF(0)+260);sg.addColorStop(0,'#dcc38a');sg.addColorStop(1,'#8f7448');
   cx.beginPath();cx.moveTo(a,floorY(a));for(let x=a+24;x<=b;x+=24)cx.lineTo(x,floorY(x));cx.lineTo(b,bottom);cx.lineTo(a,bottom);cx.closePath();cx.fillStyle=sg;cx.fill();
   cx.beginPath();cx.moveTo(a,floorY(a));for(let x=a+24;x<=b;x+=24)cx.lineTo(x,floorY(x));cx.lineWidth=4;cx.strokeStyle=INK;cx.stroke();
   cx.lineWidth=2;cx.strokeStyle='rgba(120,92,52,.55)';
@@ -1057,36 +1338,86 @@ function drawKelp(x0,x1,front){
     cx.lineWidth=2.6;cx.strokeStyle=INK;for(let i=1;i<pts.length;i+=1){const sd=i%2?1:-1,[px,py]=pts[i];cx.save();cx.translate(px,py);cx.rotate(sd*(.9+Math.sin(T*1.3+k.ph+i)*.2));ell(sd*11,0,12,4.5);cx.fillStyle=col;cx.fill();cx.stroke();cx.restore()}
     if(front)cx.restore()}
 }
+// one side wall from ya to yb (side -1 west, +1 east), with the wobbly rock edge
+function wallSeg(side,ya,yb,fill){const ex=y=>side<0?30+Math.sin(y*.013)*24+Math.sin(y*.041)*10:WW-30-Math.sin(y*.017)*24-Math.sin(y*.037)*10,far=side<0?-900:WW+900;
+  cx.beginPath();cx.moveTo(far,ya);cx.lineTo(ex(ya),ya);for(let y=Math.ceil(ya/40)*40;y<yb;y+=40)cx.lineTo(ex(y),y);cx.lineTo(ex(yb),yb);cx.lineTo(far,yb);cx.closePath();cx.fillStyle=fill;cx.fill();cx.stroke()}
+// a tunnel through the wall between o0 and o1, lit faintly by the zone on the other side
+function tunnel(side,o0,o1,light){const x=side<0?-900:WW-40,w=940,g=cx.createLinearGradient(side<0?30:WW-30,0,side<0?-900:WW+900,0);
+  g.addColorStop(0,'rgba(8,14,26,.9)');g.addColorStop(1,light);cx.fillStyle=g;cx.fillRect(x,o0,w,o1-o0)}
 function drawWalls(x0,x1,y0,y1){
-  cx.lineWidth=5;cx.strokeStyle=INK;const col=rgb(depthRGB(cam.y+600));
-  if(x0<120){cx.beginPath();cx.moveTo(-800,y0-100);cx.lineTo(30,y0-100);for(let y=Math.floor(y0/80)*80-80;y<=y1+120;y+=80)cx.lineTo(30+Math.sin(y*.013)*24+Math.sin(y*.041)*10,y);cx.lineTo(-800,y1+120);cx.closePath();cx.fillStyle=mix(col,'#000000',.45);cx.fill();cx.stroke()}
-  if(x1>WW-120){cx.beginPath();cx.moveTo(WW+800,y0-100);cx.lineTo(WW-30,y0-100);for(let y=Math.floor(y0/80)*80-80;y<=y1+120;y+=80)cx.lineTo(WW-30-Math.sin(y*.017)*24-Math.sin(y*.037)*10,y);cx.lineTo(WW+800,y1+120);cx.closePath();cx.fillStyle=mix(col,'#000000',.45);cx.fill();cx.stroke()}
+  cx.lineWidth=5;cx.strokeStyle=INK;const col=mix(rgb(depthRGB(cam.y+600)),'#000000',.45),ya=y0-100,yb=y1+120;
+  if(x0<160){if(zone===1){const[o0,o1]=openRange(1);tunnel(-1,o0,o1,'rgba(60,140,190,.85)');if(ya<o0)wallSeg(-1,ya,o0,col);if(yb>o1)wallSeg(-1,o1,yb,col)}else wallSeg(-1,ya,yb,col)}
+  if(x1>WW-160){
+    if(zone===0){const[o0,o1]=openRange(0);
+      if(breachOpen()){tunnel(1,o0,o1,'rgba(30,50,110,.95)');if(ya<o0)wallSeg(1,ya,o0,col);if(yb>o1)wallSeg(1,o1,yb,col)}
+      else{wallSeg(1,ya,yb,col);drawCrack(o0,o1)}}
+    else wallSeg(1,ya,yb,col)}
+}
+// the cracked stretch of the Sunlit Zone's east wall; the cracks glow hotter as a laser works on them
+function drawCrack(o0,o1){
+  const dmg=1-breachHp/BREACH_HP,h=o1-o0,x=WW-34;cx.save();
+  cx.beginPath();cx.ellipse(x+34,(o0+o1)/2,56,h/2,0,0,TAU);cx.fillStyle='#454b57';cx.fill();cx.lineWidth=4;cx.strokeStyle=INK;cx.stroke();
+  cx.lineWidth=2.5;const hot=`rgba(255,${Math.round(150-dmg*90)},60,${.35+dmg*.65})`;
+  const cracks=[[0,-.4,-30,-.2,-18,.05],[0,.1,-34,.3,-20,.45],[0,-.1,-26,-.05,-40,.2],[0,.35,-22,.15,-36,-.05]];
+  for(const[sx,sy,mx,my,ex,ey]of cracks){cx.beginPath();cx.moveTo(x+sx,(o0+o1)/2+sy*h);cx.lineTo(x+mx,(o0+o1)/2+my*h);cx.lineTo(x+ex,(o0+o1)/2+ey*h);
+    cx.strokeStyle=INK;cx.lineWidth=5;cx.stroke();cx.strokeStyle=hot;cx.lineWidth=2.5;cx.stroke()}
+  if(dmg>0){glow(x-10,(o0+o1)/2,90+dmg*60,'#ff9a4a',.25+dmg*.4)}
+  cx.restore();
 }
 function drawCreature(e){
   const s=SP[e.t];FLs=e.flash>0?Math.min(1,e.flash/.12):0;
   cx.save();cx.translate(e.x,e.y);
   if(e.dead)cx.globalAlpha=clamp(1-e.deadT/1.3,0,1);
   if(e.st==='windup')cx.translate(Math.sin(T*70)*1.6,0);
-  if(e.t==='jelly'){cx.rotate(e.rot);if(e.dead)cx.scale(1+e.deadT*.4,1-e.deadT*.3)}
+  if(s.jel){cx.rotate(e.rot);if(e.dead)cx.scale(1+e.deadT*.4,1-e.deadT*.3)}
   else if(e.t==='crab'){cx.rotate(e.rot);cx.scale(e.face,1);if(e.dead)cx.rotate(Math.min(e.deadT*3,Math.PI))}
   else{cx.scale(e.face,1);cx.rotate(e.tilt+(e.dead?Math.min(e.deadT*2.4,Math.PI*.9):0))}
-  cx.lineWidth=e.t==='whale'?3.8:3.2;cx.strokeStyle=INK;
+  cx.lineWidth=s.lw||(e.t==='whale'?3.8:3.2);cx.strokeStyle=INK;
   DRAW[e.t](e,isAggro(e)&&!e.dead);
   cx.restore();
-  if(e.gun){const s=SP[e.t],m=l2w(e,s.gm[0],s.gm[1]);cx.save();cx.translate(m.x,m.y);cx.rotate(e.gaim);if(Math.cos(e.gaim)<0)cx.scale(1,-1);cx.scale(s.gm[2],s.gm[2]);
-    if(e.dead)cx.globalAlpha=clamp(1-e.deadT/1.3,0,1);cx.lineJoin='round';drawGun(e.gun-1,false);cx.restore()}
-  if(e.gun===4&&!e.dead&&e.lz){const b=creatureBeam(e);if(e.lz===2)drawBeam(b,1);else{cx.save();cx.globalAlpha=.45+Math.sin(T*40)*.3;cx.beginPath();cx.moveTo(b.x1,b.y1);cx.lineTo(b.x2,b.y2);cx.lineWidth=3;cx.strokeStyle='#ff3b30';cx.stroke();cx.restore()}}
+  if(e.gun){const m=l2w(e,s.gm[0],s.gm[1]);cx.save();cx.translate(m.x,m.y);cx.rotate(e.gaim);if(Math.cos(e.gaim)<0)cx.scale(1,-1);cx.scale(s.gm[2],s.gm[2]);
+    if(e.dead)cx.globalAlpha=clamp(1-e.deadT/1.3,0,1);cx.lineJoin='round';drawGun(e.gun-1,e.lz===2,MEGA_E);cx.restore()}
+  if(beamGun(e)&&!e.dead&&e.lz){const b=creatureBeam(e),mega=e.gun===8,c=mega?MEGA_E:'#e01f1f';
+    if(e.lz===2)drawBeam(b,1,c,mega?2.4:1);else{cx.save();cx.globalAlpha=.45+Math.sin(T*40)*.3;cx.beginPath();cx.moveTo(b.x1,b.y1);cx.lineTo(b.x2,b.y2);cx.lineWidth=mega?5:3;cx.strokeStyle=mega?MEGA_E:'#ff3b30';cx.stroke();cx.restore()}}
   FLs=0;
 }
 function hpBar(e){const s=SP[e.t],w=s.bw,x=e.x-w/2,y=e.y-s.top-16;cx.lineWidth=3;cx.strokeStyle=INK;rr(x,y,w,7,3.5);cx.fillStyle='#2a0f14';cx.fill();cx.stroke();
   rr(x+1.5,y+1.5,(w-3)*clamp(e.hp/e.max,0,1),4,2);cx.fillStyle='#ff5b4f';cx.fill()}
-function drawBeam(b,alpha){
-  const fl=Math.sin(T*60)*1.5;cx.save();cx.globalAlpha=alpha;
+// a beam: ink outline, coloured body, near-white core and an additive glow; the Mega Beam is wider (w)
+function drawBeam(b,alpha,col='#e01f1f',w=1){
+  const fl=Math.sin(T*60)*1.5,[r,g,bl]=hexRgb(col),core=mix(col,'#ffffff',.75);cx.save();cx.globalAlpha=alpha;
   cx.beginPath();cx.moveTo(b.x1,b.y1);cx.lineTo(b.x2,b.y2);
-  cx.lineWidth=22+fl;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=16+fl;cx.strokeStyle='#e01f1f';cx.stroke();cx.lineWidth=7;cx.strokeStyle='#ffd6cf';cx.stroke();
-  cx.globalCompositeOperation='lighter';cx.lineWidth=46+fl*3;cx.strokeStyle='rgba(255,40,30,.16)';cx.stroke();
-  circ(b.x2,b.y2,16+fl*2);cx.fillStyle='rgba(255,90,70,.5)';cx.fill();circ(b.x1,b.y1,10);cx.fillStyle='rgba(255,200,190,.6)';cx.fill();
+  cx.lineWidth=(16+fl)*w+6;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=(16+fl)*w;cx.strokeStyle=col;cx.stroke();cx.lineWidth=7*w;cx.strokeStyle=core;cx.stroke();
+  cx.globalCompositeOperation='lighter';cx.lineWidth=(46+fl*3)*w;cx.strokeStyle=`rgba(${r},${g},${bl},.16)`;cx.stroke();
+  circ(b.x2,b.y2,(16+fl*2)*w);cx.fillStyle=`rgba(${r},${g},${bl},.5)`;cx.fill();circ(b.x1,b.y1,10*w);cx.fillStyle=`rgba(${Math.min(255,r+120)},${Math.min(255,g+120)},${Math.min(255,bl+120)},.6)`;cx.fill();
   cx.restore();
+}
+// ---- the Twilight Zone seabed
+function drawRock(r,fy){cx.beginPath();const P=r.pts;cx.moveTo(r.x+P[0][0],fy+P[0][1]);
+  for(let i=1;i<P.length;i++){const mx=(P[i-1][0]+P[i][0])/2,my=(P[i-1][1]+P[i][1])/2;cx.quadraticCurveTo(r.x+P[i-1][0],fy+P[i-1][1],r.x+mx,fy+my)}
+  cx.lineTo(r.x+P[P.length-1][0],fy+P[P.length-1][1]);cx.lineTo(r.x+P[P.length-1][0],fy+80);cx.lineTo(r.x+P[0][0],fy+80);cx.closePath();
+  cx.fillStyle=r.c;cx.fill();cx.stroke();cx.save();cx.clip();ell(r.x-r.s*.3,fy-r.s*.45,r.s*.5,r.s*.16,-.2);cx.fillStyle='rgba(160,180,255,.08)';cx.fill();cx.restore()}
+function drawFloor1(x0,x1,y1){
+  const a=Math.floor((x0-40)/24)*24,b=x1+40,F=ZF(1),bottom=Math.max(y1+40,F+400);
+  if(y1<F-500)return; // the seabed is far below
+  cx.lineWidth=3.4;cx.strokeStyle=INK;
+  for(const r of DEC1.rocks){if(r.x<x0-r.s*1.6||r.x>x1+r.s*1.6)continue;drawRock(r,floorY(r.x,1)+r.s*.2)}
+  // hydrothermal vents: dark chimneys glowing at the mouth, with a shimmering plume
+  for(const v of DEC1.vents){if(v.x<x0-120||v.x>x1+120)continue;const fy=floorY(v.x,1)+8,top=fy-v.h;
+    for(let i=0;i<6;i++){const t=((T*.35+i/6+v.ph)%1),py=top-t*220,pr=v.w*.3+t*40;cx.save();cx.globalAlpha=(1-t)*.18;circ(v.x+Math.sin(T*2+i+v.ph)*12*t,py,pr);cx.fillStyle='#c8c8d8';cx.fill();cx.restore()}
+    cx.beginPath();cx.moveTo(v.x-v.w/2,fy+10);cx.lineTo(v.x-v.w*.28,top);cx.lineTo(v.x+v.w*.28,top);cx.lineTo(v.x+v.w/2,fy+10);cx.closePath();cx.fillStyle='#2a2630';cx.fill();cx.lineWidth=3.2;cx.strokeStyle=INK;cx.stroke();
+    glow(v.x,top,30,'#ff7a3a',.55+Math.sin(T*3+v.ph)*.15);ell(v.x,top,v.w*.28,4);cx.fillStyle='#ff9a4a';cx.fill()}
+  // tube worms: white tubes with red plumes
+  for(const tb of DEC1.tubes){if(tb.x<x0-60||tb.x>x1+60)continue;const fy=floorY(tb.x,1)+6;
+    for(let i=0;i<tb.n;i++){const x=tb.x+(i-tb.n/2)*9,h=tb.h*(.6+((i*37)%10)/20);cx.lineWidth=2.4;cx.strokeStyle=INK;rr(x-3,fy-h,6,h+6,3);cx.fillStyle='#e9e4d6';cx.fill();cx.stroke();
+      ell(x+Math.sin(T*1.5+i+tb.ph)*2,fy-h-4,5,6);cx.fillStyle='#d6334a';cx.fill();cx.stroke()}}
+  const sg=cx.createLinearGradient(0,F-200,0,F+300);sg.addColorStop(0,'#2e2c3a');sg.addColorStop(1,'#0f0e16');
+  cx.beginPath();cx.moveTo(a,floorY(a,1));for(let x=a+24;x<=b;x+=24)cx.lineTo(x,floorY(x,1));cx.lineTo(b,bottom);cx.lineTo(a,bottom);cx.closePath();cx.fillStyle=sg;cx.fill();
+  cx.beginPath();cx.moveTo(a,floorY(a,1));for(let x=a+24;x<=b;x+=24)cx.lineTo(x,floorY(x,1));cx.lineWidth=4;cx.strokeStyle=INK;cx.stroke();
+  // glowing anemones dotted over the silt
+  for(const g of DEC1.glow){if(g.x<x0-40||g.x>x1+40)continue;const fy=floorY(g.x,1)+4,sw=Math.sin(T*1.2+g.ph)*4,tw=.6+.4*Math.sin(T*2+g.ph);
+    cx.beginPath();cx.moveTo(g.x,fy);cx.quadraticCurveTo(g.x+sw,fy-g.h*.6,g.x+sw*1.5,fy-g.h);cx.lineWidth=4;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=2;cx.strokeStyle='#3c3550';cx.stroke();
+    glow(g.x+sw*1.5,fy-g.h,16,g.c,.5*tw);circ(g.x+sw*1.5,fy-g.h,3.5);cx.fillStyle=g.c;cx.fill();cx.lineWidth=1.6;cx.strokeStyle=INK;cx.stroke()}
 }
 function drawProj(){
   for(const b of proj){
@@ -1094,6 +1425,13 @@ function drawProj(){
       cx.beginPath();cx.moveTo(-14,0);cx.lineTo(-26-Math.random()*10,-4);cx.lineTo(-22-Math.random()*8,0);cx.lineTo(-26-Math.random()*10,4);cx.closePath();cx.fillStyle='#ffcf5a';cx.fill();
       cx.beginPath();cx.moveTo(-12,-4);cx.lineTo(-18,-9);cx.lineTo(-16,0);cx.lineTo(-18,9);cx.lineTo(-12,4);cx.closePath();cx.fillStyle='#3e5226';cx.fill();cx.stroke();
       rr(-14,-4.5,22,9,4);cx.fillStyle='#8aa35c';cx.fill();cx.stroke();cx.beginPath();cx.moveTo(8,-4.5);cx.quadraticCurveTo(16,0,8,4.5);cx.closePath();cx.fillStyle='#d1453a';cx.fill();cx.stroke();cx.restore()}
+    else if(b.k==='bubble'||b.st==='bubble'){const r=b.r*(1+Math.sin(b.ph)*.12);circ(b.x,b.y,r);cx.fillStyle=b.k==='bubble'?'rgba(170,230,255,.28)':'rgba(255,170,190,.28)';cx.fill();
+      cx.lineWidth=2;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=1.2;cx.strokeStyle=b.k==='bubble'?'#dff6ff':'#ffd0dc';cx.stroke();circ(b.x-r*.35,b.y-r*.35,r*.25);cx.fillStyle='rgba(255,255,255,.8)';cx.fill()}
+    else if(b.k==='tooth'||b.st==='tooth'){cx.save();cx.translate(b.x,b.y);cx.rotate(Math.atan2(b.vy,b.vx));if(b.k==='tooth')cx.scale(1.5,1.5);cx.beginPath();cx.moveTo(9,0);cx.lineTo(-6,-5);cx.quadraticCurveTo(-9,0,-6,5);cx.closePath();
+      cx.fillStyle=b.k==='tooth'?'#fffaf0':'#f0d8d8';cx.fill();cx.lineWidth=2;cx.strokeStyle=INK;cx.stroke();cx.restore()}
+    else if(b.k==='light'||b.st==='light'){const sp=Math.hypot(b.vx,b.vy)||1,l=b.k==='light'?115:45,ex=b.x-b.vx/sp*l,ey=b.y-b.vy/sp*l,c=`hsl(${(b.hue+T*240)%360},100%,62%)`;
+      const lw=b.k==='light'?1:.7;cx.beginPath();cx.moveTo(b.x,b.y);cx.lineTo(ex,ey);cx.lineWidth=10*lw;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=6*lw;cx.strokeStyle=c;cx.stroke();cx.lineWidth=2.2*lw;cx.strokeStyle='#ffffff';cx.stroke();
+      cx.save();cx.globalCompositeOperation='lighter';cx.lineWidth=22*lw;cx.strokeStyle=`hsla(${(b.hue+T*240)%360},100%,60%,.3)`;cx.stroke();cx.restore()}
     else{const sp=Math.hypot(b.vx,b.vy)||1,l=clamp(sp*.012,12,36);cx.beginPath();cx.moveTo(b.x,b.y);cx.lineTo(b.x-b.vx/sp*l,b.y-b.vy/sp*l);cx.lineWidth=6;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=2.8;cx.strokeStyle=b.k==='ebullet'?'#ff6b55':b.own?'#ffe28a':'#fff2c4';cx.stroke()}
   }
 }
@@ -1122,11 +1460,14 @@ function buildTitle(){
     b.addEventListener('click',()=>{selColor=i;try{localStorage.setItem('finfury-color',i)}catch(e){}for(const o of sw.children)o.setAttribute('aria-pressed',String(o===b));$('color-name').textContent=c.n});sw.append(b)});
   $('color-name').textContent=COLORS[selColor].n;
   const ul=$('beasts');
-  for(const t of ORDER){const s=SP[t],li=document.createElement('li'),cv=document.createElement('canvas');cv.width=192;cv.height=104;
+  for(const t of ORDER){
+    if(SP[t].rank===0){const h=document.createElement('li'),hb=document.createElement('b'),hs=document.createElement('span');h.className='zonehead';
+      hb.textContent=ZONES[SP[t].z].name;hs.textContent=SP[t].z?'Past the cracked east wall of the Sunlit Zone. Bring a laser.':'Where every swim starts.';h.append(hb,hs);ul.append(h)}
+    const s=SP[t],li=document.createElement('li'),cv=document.createElement('canvas');cv.width=192;cv.height=104;
     const k=cv.getContext('2d'),[pw,ph,ox,oy]=PORT[t],sc=Math.min(176/pw,92/ph),o=cx;cx=k;k.translate(96-ox*sc,52-oy*sc);k.scale(sc,sc);k.lineJoin='round';k.lineCap='round';k.lineWidth=3.2;k.strokeStyle=INK;
     const fake={anim:1,ph:0,vx:0,vy:0,st:'wander',face:1};DRAW[t](fake,false);cx=o;
     const d=document.createElement('div'),b=document.createElement('b'),tag=document.createElement('span'),sp=document.createElement('span');
-    b.textContent=s.name;tag.className='tag';tag.textContent=s.rar;tag.style.color=['#9fb9c6','#9fb9c6','#6fd08a','#6fd08a','#ffd88a','#ffb43d','#ff7a6e'][ORDER.indexOf(t)];b.append(tag);
+    b.textContent=s.name;tag.className='tag';tag.textContent=s.rar;tag.style.color=['#9fb9c6','#9fb9c6','#6fd08a','#6fd08a','#ffd88a','#ffb43d','#ff7a6e'][s.rank+(s.z?1:0)];b.append(tag);
     beastSpans[t]=sp;
     d.append(b,sp);li.append(cv,d);ul.append(li)}
 }
@@ -1154,8 +1495,11 @@ function updWorld(dt){
   updProj(dt);updDrops(dt);updParts(dt);contactCheck();laserBurn(dt);
   // camera
   if(pl&&state!=='title'){const lk=60;cam.x+=(pl.x+Math.cos(pl.aim)*lk-cam.x)*Math.min(1,dt*5);cam.y+=(pl.y+Math.sin(pl.aim)*lk*.6-cam.y)*Math.min(1,dt*5)}
-  else{cam.x=WW/2+Math.sin(T*.03)*2600;cam.y=FL-560+Math.sin(T*.07)*120}
-  const hw=VW/2/Z,hh=VH/2/Z;cam.x=clamp(cam.x,hw-60,WW-hw+60);cam.y=clamp(cam.y,-60+hh*.3,FL+170-hh);
+  else{cam.x=WW/2+Math.sin(T*.03)*2600;cam.y=ZF(0)-560+Math.sin(T*.07)*120}
+  // the camera may look a little way into a tunnel; the Sunlit Zone shows the sky above, the Twilight Zone only darkness
+  const hw=VW/2/Z,hh=VH/2/Z,xl=zone===1?hw-300:hw-60,xr=zone===0&&breachOpen()?WW-hw+300:WW-hw+60;
+  cam.x=clamp(cam.x,xl,xr);cam.y=clamp(cam.y,zone?ZT(1)-120+hh*.5:-60+hh*.3,ZF(zone)+170-hh);
+  if(zoneBanner>0)zoneBanner-=dt;
 }
 
 // ===================================================================== multiplayer
@@ -1171,24 +1515,24 @@ function fit(o,keys){let s=JSON.stringify(o),guard=0;
   while(s.length>3700&&guard++<30){let big=null;for(const k of keys)if(o[k]&&o[k].length&&(!big||o[k].length>o[big].length))big=k;if(!big)break;
     const n=o[big].length,cut=Math.max(1,Math.ceil(n*.2));o[big]=big==='E'?o[big].slice(0,n-cut):o[big].slice(cut);s=JSON.stringify(o)}return o}
 function encMe(){const p=pl,on=NET.started&&p&&state!=='title';
-  return{nk:NET.nick||'Fish',cl:selColor,h:NET.host?1:0,k:kills,pk:pvpKills,P:on?[Math.round(p.x),Math.round(p.y),Math.round(p.vx),Math.round(p.vy),r2(p.aim),Math.ceil(p.hp),tier,p.alive?1:0,p.laser?1:0]:0,H:outList('H'),S:outList('S'),D:outList('D'),K:outList('K')}}
+  return{nk:NET.nick||'Fish',cl:selColor,h:NET.host?1:0,k:kills,pk:pvpKills,P:on?[Math.round(p.x),Math.round(p.y),Math.round(p.vx),Math.round(p.vy),r2(p.aim),Math.ceil(p.hp),tier,p.alive?1:0,p.laser?1:0,zone]:0,br:breached?1:0,H:outList('H'),S:outList('S'),D:outList('D'),K:outList('K')}}
 function encWorld(){
   if(!NET.started)return{st:0,md:NET.mode,df:diff,gg:gg?1:0,E:[],G:[],B:[]};
-  const R=players(),l=creatures.filter(e=>!e.dead&&!e.gone);if(R.length)l.sort((a,b)=>minDist(a.x,a.y,R)-minDist(b.x,b.y,R));
-  return{st:1,md:NET.mode,df:diff,gg:gg?1:0,E:l.slice(0,80).map(e=>[e.id,ORDER.indexOf(e.t),Math.round(e.x),Math.round(e.y),Math.round(e.vx),Math.round(e.vy),Math.ceil(e.hp),STS.indexOf(e.st),e.ac,e.tgt?1:0,e.face,e.gun,e.gun?r2(e.gaim):0,e.lz||0]),G:outList('G'),B:outList('B')}}
-function mkRemote(peer){return{id:peer,x:0,y:0,tx:0,ty:0,tvx:0,tvy:0,vx:0,vy:0,aim:0,face:1,tilt:0,tail:0,hp:100,tier:0,alive:false,laser:false,cl:0,nk:'Fish',k:0,init:false}}
+  const l=creatures.filter(e=>!e.dead&&!e.gone),P=[players(0),players(1)];l.sort((a,b)=>minDist(a.x,a.y,P[a.z])-minDist(b.x,b.y,P[b.z]));
+  return{st:1,md:NET.mode,df:diff,gg:gg?1:0,E:l.slice(0,80).map(e=>[e.id,ORDER.indexOf(e.t),Math.round(e.x),Math.round(e.y),Math.round(e.vx),Math.round(e.vy),Math.ceil(e.hp),STS.indexOf(e.st),e.ac,e.tgt?1:0,e.face,e.gun,e.gun?r2(e.gaim):0,e.lz||0,e.z]),G:outList('G'),B:outList('B')}}
+function mkRemote(peer){return{id:peer,z:0,br:false,x:0,y:0,tx:0,ty:0,tvx:0,tvy:0,vx:0,vy:0,aim:0,face:1,tilt:0,tail:0,hp:100,tier:0,alive:false,laser:false,cl:0,nk:'Fish',k:0,init:false}}
 function applyPeer(peer,pr,r){
-  r.nk=String(pr.nk||'Fish').slice(0,14);r.cl=clamp(pr.cl|0,0,COLORS.length-1);r.k=pr.k|0;r.pk=pr.pk|0;r.h=!!pr.h;
+  r.nk=String(pr.nk||'Fish').slice(0,14);r.cl=clamp(pr.cl|0,0,COLORS.length-1);r.k=pr.k|0;r.pk=pr.pk|0;r.h=!!pr.h;if(pr.br&&!r.br&&NET.started&&zone===0)toast(`${r.nk} blasted through the east wall. The Twilight Zone is open.`,'#7fd8ff');r.br=!!pr.br;
   const P=pr.P;
-  if(Array.isArray(P)){r.tx=+P[0]||0;r.ty=+P[1]||0;r.tvx=+P[2]||0;r.tvy=+P[3]||0;r.aim=(+P[4]||0)/100;r.hp=+P[5]||0;r.tier=clamp(P[6]|0,0,3);
-    const al=!!P[7];if(!r.init||(al&&!r.alive)){r.x=r.tx;r.y=r.ty;r.init=true}r.alive=al;r.laser=!!P[8]&&r.tier===3}
+  if(Array.isArray(P)){r.tx=+P[0]||0;r.ty=+P[1]||0;r.tvx=+P[2]||0;r.tvy=+P[3]||0;r.aim=(+P[4]||0)/100;r.hp=+P[5]||0;r.tier=clamp(P[6]|0,0,GUNS.length-1);r.z=clamp(P[9]|0,0,1);
+    const al=!!P[7];if(!r.init||(al&&!r.alive)){r.x=r.tx;r.y=r.ty;r.init=true}r.alive=al;r.laser=!!P[8]&&isLaser(r.tier)}
   else r.alive=false;
   if(!NET.started)return;
-  for(const s of fresh(peer,'S',pr.S))if(Math.hypot(s[1]-cam.x,s[2]-cam.y)<2200)addShot(+s[1],+s[2],(+s[3]||0)/100,clamp(s[4]|0,0,2),false);
+  for(const s of fresh(peer,'S',pr.S))if((s[5]|0)===zone&&Math.hypot(s[1]-cam.x,s[2]-cam.y)<2200)addShot(+s[1],+s[2],(+s[3]||0)/100,clamp(s[4]|0,0,GUNS.length-1),false);
   if(pvpOn()){
     for(const d of fresh(peer,'D',pr.D))if(d[1]===NET.me&&pl&&pl.alive&&state!=='title')damagePlayer(clamp((+d[2]||0)/10,0,300),r,false,peer);
     for(const k of fresh(peer,'K',pr.K)){const killer=k[1];if(killer===NET.me){pvpKills++;toast(`You blasted ${r.nk}`,'#ffb43d');
-      if(NET.mode==='pvp'&&tier<3){tier++;sfx.up();toast(`Gun upgraded: ${GUNS[tier].name}`,'#ffb43d')}}else toast(`${nameOf(killer)} blasted ${r.nk}`)}
+      if(NET.mode==='pvp'&&tier<GUNS.length-1){tier++;sfx.up();toast(`Gun upgraded: ${GUNS[tier].name}`,'#ffb43d');breachHint()}}else toast(`${nameOf(killer)} blasted ${r.nk}`)}
   }
   if(NET.host)for(const h of fresh(peer,'H',pr.H)){const e=creatures.find(c=>c.id===h[1]);if(e&&!e.dead)hurtCreature(e,clamp((+h[2]||0)/10,0,600),peer)}
 }
@@ -1199,12 +1543,12 @@ function applyWorld(peer,w){
   if(!NET.started){if(w.st&&NET.ready)startMP();return}
   const ids=new Set();
   for(const a of w.E||[]){if(!Array.isArray(a))continue;const id=a[0];ids.add(id);let e=NET.mirrors.get(id);
-    if(!e){const t=ORDER[a[1]];if(!t)continue;e=mkCreature(t,+a[2]||0,+a[3]||0,0);e.id=id;e.mirror=true;e.tx=e.x;e.ty=e.y;NET.mirrors.set(id,e);creatures.push(e)}
+    if(!e){const t=ORDER[a[1]];if(!t)continue;e=mkCreature(t,+a[2]||0,+a[3]||0,0,clamp(a[14]|0,0,1));e.id=id;e.mirror=true;e.tx=e.x;e.ty=e.y;NET.mirrors.set(id,e);creatures.push(e)}
     if(e.dead)continue;e.tx=+a[2]||0;e.ty=+a[3]||0;e.tvx=+a[4]||0;e.tvy=+a[5]||0;const hp=+a[6]||0;e.hp=T-e.lastHitMe<.4?Math.min(e.hp,hp):hp;
-    e.st=STS[a[7]]||'wander';e.ac=a[8]|0;e.ag=!!a[9];e.wface=a[10]<0?-1:1;e.gun=clamp(a[11]|0,0,4);e.lz=clamp(a[13]|0,0,2);e.tgaim=(+a[12]||0)/100;if(e.isNew!==false){e.gaim=e.tgaim;e.isNew=false}e.miss=0}
-  for(const b of fresh(peer,'B',w.B))if(pl&&Math.hypot(b[1]-pl.x,b[2]-pl.y)<2000)addEnemyShot(+b[1],+b[2],(+b[3]||0)/100,clamp(b[4]|0,0,2));
+    e.st=STS[a[7]]||'wander';e.ac=a[8]|0;e.ag=!!a[9];e.wface=a[10]<0?-1:1;e.gun=clamp(a[11]|0,0,8);e.z=clamp(a[14]|0,0,1);e.lz=clamp(a[13]|0,0,2);e.tgaim=(+a[12]||0)/100;if(e.isNew!==false){e.gaim=e.tgaim;e.isNew=false}e.miss=0}
+  for(const b of fresh(peer,'B',w.B))if((b[5]|0)===zone&&pl&&Math.hypot(b[1]-pl.x,b[2]-pl.y)<2000)addEnemyShot(+b[1],+b[2],(+b[3]||0)/100,clamp(b[4]|0,0,6));
   for(const[id,e]of NET.mirrors)if(!ids.has(id)&&!e.dead&&++e.miss>10){e.gone=true;e.dead=true;e.deadT=9;NET.mirrors.delete(id)}
-  for(const g of fresh(peer,'G',w.G)){const e=NET.mirrors.get(g[1]);if(e){if(!e.dead){e.x=+g[3]||e.x;e.y=+g[4]||e.y;killFx(e)}}else{const t=ORDER[g[2]];if(t&&pl&&Math.hypot(g[3]-pl.x,g[4]-pl.y)<1500)spawnDrops(t,+g[3],+g[4])}}
+  for(const g of fresh(peer,'G',w.G)){const e=NET.mirrors.get(g[1]);if(e){if(!e.dead){e.x=+g[3]||e.x;e.y=+g[4]||e.y;killFx(e)}}else{const t=ORDER[g[2]];if(t&&pl&&(g[5]|0)===zone&&Math.hypot(g[3]-pl.x,g[4]-pl.y)<1500)spawnDrops(t,+g[3],+g[4])}}
 }
 function netTick(dt){
   const room=NET.room;if(!room)return;
@@ -1237,6 +1581,7 @@ function spawnPoint(){
   if(NET.mode!=='coop'&&others.length){let best=null,bd=-1;for(let i=0;i<24;i++){const x=rand(600,WW-600),y=floorY(x)-rand(250,900),d=minDist(x,y,others);if(d>bd){bd=d;best={x,y}}}return best}
   const m=others[(Math.random()*others.length)|0];
   if(m)return{x:clamp(m.x+rand(-120,120),100,WW-100),y:m.y-60};
+  if(zone===1){const[o0,o1]=openRange(1);return{x:180,y:(o0+o1)/2}} // alone in the Twilight Zone: back at its entrance
   const x=WW/2+rand(-180,180);return{x,y:floorY(x)-360};
 }
 const MODES={coop:{n:'Co-op',d:'Everyone fights the creatures together. Nobody can hurt another fish.'},
@@ -1253,7 +1598,7 @@ function endRoom(msg){
   leaveRooms();
   Object.assign(NET,{active:false,started:false,ready:false,host:false,code:'',me:'',mode:'coop',remotes:new Map(),mirrors:new Map(),lastP:new Map(),lastW:null,lobbySig:'',hacc:new Map(),dacc:new Map()});
   setDiff(selDiff,false);setGG(selGG,false);
-  if(state!=='title'){state='title';pl=null;laserSound(false);creatures=[];proj=[];drops=[];seedCreatures(16)}
+  if(state!=='title'){state='title';pl=null;zone=0;laserSound(false);creatures=[];proj=[];drops=[];seedCreatures(16)}
   for(const id of['mp','dead','pause','bench'])$(id).hidden=true;$('title').hidden=false;$('hud').hidden=true;$('hint').hidden=true;
   if(msg)toast(msg);
 }

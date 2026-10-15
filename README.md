@@ -4,6 +4,14 @@ A side-view underwater shooter for one to six players. You're a very small fish 
 
 **Play:** https://jasonninja15.github.io/fin-fury/
 
+## Two zones
+
+Every swim starts in **the Sunlit Zone**: jellyfish, crabs, sea turtles, swordfish, sharks, orcas and whales. Their parts build the handgun up to a rifle, a bazooka and the Huge Red Laser.
+
+Once you have the laser, hold it on the cracked rock near the seabed on the Sunlit Zone's east wall. After a few seconds it breaks, and a tunnel leads down into **the Twilight Zone**, which is twice as deep. Its creatures are deep jellyfish, bristlemouths, viperfish, swallowers, giant squid and sperm whales. Their parts unlock four more guns: the **Bubble Blaster**, the **Light Show**, the **Tooth Shooter** and the **Mega Beam**, a wider laser in your fish's own colour. The tunnel on the Twilight Zone's west wall leads back up.
+
+Every part you pick up heals you. A stinger heals 5, and each creature further down the list heals 5 more, up to 65 for a sperm whale's ambergris.
+
 ## Install it as an app (Chromebooks included)
 
 1. Open the link above in Chrome.
