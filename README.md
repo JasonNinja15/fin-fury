@@ -45,7 +45,7 @@ The host's difficulty (**Normal**, **Frenzy** or **Insanity**) and **Guns Galore
 | Esc | Pause (in a room, the ocean keeps going) |
 | M | Mute |
 
-On touch screens, drag anywhere on the left half to swim, drag the right stick to aim and shoot, and tap **Dash** to dodge.
+On phones and tablets, put your left thumb down anywhere on the left half and drag to swim. Put your right thumb down anywhere on the right half and drag to aim and shoot, or just hold it still to lock on to the nearest creature. Tap **Dash** to dodge. Touch controls turn on by themselves the first time you touch the screen.
 
 ## Files
 

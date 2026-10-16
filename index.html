@@ -74,7 +74,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
 .dashbar{width:90px;height:8px;background:#0c1a28;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
 .dashbar i{display:block;height:100%;width:100%;background:#7fd6ff}
 .dashbar.ready i{background:#bff0ff;box-shadow:0 0 8px #7fd6ff}
-#t-dash{position:absolute;right:calc(190px + env(safe-area-inset-right,0px));bottom:calc(50px + env(safe-area-inset-bottom,0px));width:76px;height:76px;border-radius:50%;pointer-events:auto;touch-action:none;font-weight:800;background:rgba(127,214,255,.35);border:3px solid var(--ink);color:var(--foam)}
+#t-dash{position:absolute;z-index:2;right:calc(18px + env(safe-area-inset-right,0px));bottom:calc(22px + env(safe-area-inset-bottom,0px));width:88px;height:88px;font-size:1.05rem;border-radius:50%;pointer-events:auto;touch-action:none;font-weight:800;background:rgba(127,214,255,.35);border:3px solid var(--ink);color:var(--foam)}
 .gunline{display:flex;gap:12px;align-items:baseline;text-shadow:0 2px 0 var(--ink)}
 #gun-name{font-family:var(--d);font-weight:800;color:var(--gold-2);font-size:1.05rem}
 #kills{color:var(--mist);font-size:.9rem;font-variant-numeric:tabular-nums}
@@ -133,8 +133,14 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
 #t-zone{position:absolute;left:0;top:0;bottom:0;width:50%;pointer-events:auto;touch-action:none}
 .stick{position:absolute;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:3px solid rgba(233,242,239,.35);background:rgba(4,10,18,.3);pointer-events:none}
 .stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(233,242,239,.5);border:3px solid var(--ink)}
-#t-stickR{left:auto;top:auto;right:calc(40px + env(safe-area-inset-right,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));margin:0;pointer-events:auto;touch-action:none;width:130px;height:130px;border-color:rgba(255,180,61,.55)}
-#t-stickR i{background:rgba(255,180,61,.6)}
+#t-zoneR{position:absolute;right:0;top:0;bottom:0;width:50%;pointer-events:auto;touch-action:none}
+.stick.aim{border-color:rgba(255,180,61,.6)}
+.stick.aim i{background:rgba(255,180,61,.65)}
+#t-dash.on{background:rgba(127,214,255,.75);transform:scale(.94)}
+#touch,#touch *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.touch .hud-r .btn{min-height:46px;padding:10px 16px}
+body.touch .hint{bottom:calc(128px + env(safe-area-inset-bottom,0px));max-width:min(520px,calc(100vw - 32px))}
+body.touch #pause-open kbd,body.touch #up-open kbd{display:none}
 @media (prefers-reduced-motion:reduce){.btn.glow,.slot.pop{animation:none}}
 </style>
 
@@ -259,7 +265,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
   </div>
 </section>
 
-<div id="touch" hidden><div id="t-zone"></div><div class="stick" id="t-stickL" hidden><i></i></div><div class="stick" id="t-stickR"><i></i></div><button id="t-dash" type="button">Dash</button></div>
+<div id="touch" hidden><div id="t-zone"></div><div id="t-zoneR"></div><div class="stick" id="t-stickL" hidden><i></i></div><div class="stick aim" id="t-stickR" hidden><i></i></div><button id="t-dash" type="button">Dash</button></div>
 
 <script>
 'use strict';
@@ -1018,6 +1024,7 @@ function updPlayer(dt,input){
   if(input){ix=(K.KeyD||K.ArrowRight?1:0)-(K.KeyA||K.ArrowLeft?1:0)+TC.mx;iy=(K.KeyS||K.ArrowDown?1:0)-(K.KeyW||K.ArrowUp?1:0)+TC.my;
     const l=Math.hypot(ix,iy);if(l>1){ix/=l;iy/=l}
     if(TC.aimOn){p.aim=TC.aimAng;firing=true}
+    else if(TC.aimHeld){const a=touchAutoAim(p);if(a!==null){p.aim=a;firing=true}}
     else if(mouse.seen&&!IS_TOUCH){const b=gunBase(p),wx=cam.x+(mouse.x-VW/2)/Z,wy=cam.y+(mouse.y-VH/2)/Z;p.aim=Math.atan2(wy-b.y,wx-b.x);firing=mouse.down}
     else if(Math.hypot(ix,iy)>.2)p.aim=Math.atan2(iy,ix);
   }
@@ -1237,7 +1244,7 @@ function resetRun(){
   pl=newPlayer();cam.x=pl.x;cam.y=pl.y;NET.mirrors=new Map();refreshBag(true);
 }
 function seedCreatures(n,z=0){for(let i=0;i<n;i++)spawnGroup(false,z)}
-function showHud(){$('hud').hidden=false;const h=$('hint');h.hidden=false;h.style.opacity=1;setTimeout(()=>h.style.opacity=0,9000)}
+function showHud(){if(IS_TOUCH&&innerHeight>innerWidth)setTimeout(()=>toast('Turn your phone sideways for a wider view.','#9fb9c6'),600);$('hud').hidden=false;const h=$('hint');h.hidden=false;h.style.opacity=1;setTimeout(()=>h.style.opacity=0,9000)}
 function startSP(){
   initAudio();if(AC&&AC.state==='suspended')AC.resume();
   setDiff(selDiff,false);setGG(selGG,false);
@@ -1769,23 +1776,45 @@ const PeerNet=(()=>{
 (async()=>{let api=null;try{const c=window.claude;if(c&&c.use)api=await c.use('room');else if(window.Peer)api=PeerNet}catch(e){api=null}NET.api=api;NET.apiReady=true;if(!$('mp').hidden&&!NET.active)openMP()})();
 
 // ===================================================================== touch controls
-const IS_TOUCH=matchMedia('(hover: none) and (pointer: coarse)').matches;
-const TC={mx:0,my:0,moveId:null,ox:0,oy:0,aimId:null,aimOn:false,aimAng:0,rcx:0,rcy:0};
+// Twin floating sticks: put a thumb down anywhere on the left half to swim, anywhere on the right half to aim
+// and shoot. Holding the right thumb still (no drag) aims at the nearest creature for you and fires.
+// They switch on by themselves the first time the screen is touched, and back off when a mouse moves.
+const TC={mx:0,my:0,moveId:null,ox:0,oy:0,aimId:null,aimOn:false,aimHeld:false,aimAng:0,rcx:0,rcy:0};
+let IS_TOUCH=matchMedia('(hover: none) and (pointer: coarse)').matches;
+const KEYS_DESK=$('keys').innerHTML,HINT_DESK=$('hint').textContent;
+function setTouchMode(on){
+  IS_TOUCH=on;document.body.classList.toggle('touch',on);
+  $('keys').innerHTML=on?'<kbd>Left thumb</kbd><span>Swim. Put it down anywhere on the left half and drag</span><kbd>Right thumb</kbd><span>Aim and shoot. Drag to aim, or just hold to lock on to the nearest creature</span><kbd>Dash</kbd><span>Burst away. Nothing can hurt you mid-dash</span><kbd>Upgrade gun</kbd><span>The button at the top right</span><kbd>Parts</kbd><span>Heal you. Parts from bigger creatures heal more</span>':KEYS_DESK;
+  $('hint').textContent=on?'Left thumb swims · Right thumb aims and shoots (hold still to lock on) · Dash dodges':HINT_DESK;
+}
+addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&!IS_TOUCH)setTouchMode(true)},true);
+addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&IS_TOUCH&&(Math.abs(e.movementX)+Math.abs(e.movementY))>2)setTouchMode(false)});
 (function(){
-  if(!IS_TOUCH)return;
-  const R=48,zone=$('t-zone'),stL=$('t-stickL'),knL=stL.firstElementChild,stR=$('t-stickR'),knR=stR.firstElementChild;
-  zone.addEventListener('pointerdown',e=>{if(TC.moveId!==null)return;TC.moveId=e.pointerId;try{zone.setPointerCapture(e.pointerId)}catch(x){}TC.ox=e.clientX;TC.oy=e.clientY;stL.style.left=e.clientX+'px';stL.style.top=e.clientY+'px';knL.style.transform='';stL.hidden=false;e.preventDefault()});
-  zone.addEventListener('pointermove',e=>{if(e.pointerId!==TC.moveId)return;let dx=e.clientX-TC.ox,dy=e.clientY-TC.oy;const d=Math.hypot(dx,dy);if(d>R){dx*=R/d;dy*=R/d}knL.style.transform=`translate(${dx}px,${dy}px)`;const on=Math.hypot(dx,dy)/R>.15;TC.mx=on?dx/R:0;TC.my=on?dy/R:0});
-  const endL=e=>{if(e.pointerId!==TC.moveId)return;TC.moveId=null;TC.mx=TC.my=0;stL.hidden=true};zone.addEventListener('pointerup',endL);zone.addEventListener('pointercancel',endL);
-  const moveR=e=>{let dx=e.clientX-TC.rcx,dy=e.clientY-TC.rcy;const d=Math.hypot(dx,dy);if(d>R){dx*=R/d;dy*=R/d}knR.style.transform=`translate(${dx}px,${dy}px)`;if(d>12){TC.aimOn=true;TC.aimAng=Math.atan2(dy,dx)}else TC.aimOn=false};
-  stR.addEventListener('pointerdown',e=>{if(TC.aimId!==null)return;TC.aimId=e.pointerId;try{stR.setPointerCapture(e.pointerId)}catch(x){}const r=stR.getBoundingClientRect();TC.rcx=r.left+r.width/2;TC.rcy=r.top+r.height/2;moveR(e);e.preventDefault()});
-  stR.addEventListener('pointermove',e=>{if(e.pointerId===TC.aimId)moveR(e)});
-  $('t-dash').addEventListener('pointerdown',e=>{e.preventDefault();if(state==='play')dashPressed=true});
-  const endR=e=>{if(e.pointerId!==TC.aimId)return;TC.aimId=null;TC.aimOn=false;knR.style.transform=''};stR.addEventListener('pointerup',endR);stR.addEventListener('pointercancel',endR);
-  $('keys').innerHTML='<kbd>Left thumb</kbd><span>Swim, from anywhere on the left half</span><kbd>Right stick</kbd><span>Drag to aim and shoot</span><kbd>Dash</kbd><span>Burst away. Nothing can hurt you mid-dash</span><kbd>Upgrade gun</kbd><span>The button at the top right</span>';
-  $('hint').textContent='Left thumb swims · Drag the right stick to aim and shoot · Tap Dash to dodge';
+  const R=52,zL=$('t-zone'),zR=$('t-zoneR'),stL=$('t-stickL'),knL=stL.firstElementChild,stR=$('t-stickR'),knR=stR.firstElementChild;
+  const place=(st,kn,e)=>{st.style.left=e.clientX+'px';st.style.top=e.clientY+'px';kn.style.transform='';st.hidden=false};
+  zL.addEventListener('pointerdown',e=>{if(TC.moveId!==null)return;TC.moveId=e.pointerId;try{zL.setPointerCapture(e.pointerId)}catch(x){}TC.ox=e.clientX;TC.oy=e.clientY;place(stL,knL,e);e.preventDefault()});
+  zL.addEventListener('pointermove',e=>{if(e.pointerId!==TC.moveId)return;let dx=e.clientX-TC.ox,dy=e.clientY-TC.oy;const d=Math.hypot(dx,dy);
+    // a thumb dragged past the rim drags the stick along with it, so you never run out of room
+    if(d>R*1.6){TC.ox+=dx/d*(d-R*1.6);TC.oy+=dy/d*(d-R*1.6);stL.style.left=TC.ox+'px';stL.style.top=TC.oy+'px';dx=e.clientX-TC.ox;dy=e.clientY-TC.oy}
+    const dd=Math.hypot(dx,dy);if(dd>R){dx*=R/dd;dy*=R/dd}knL.style.transform=`translate(${dx}px,${dy}px)`;const on=Math.hypot(dx,dy)/R>.15;TC.mx=on?dx/R:0;TC.my=on?dy/R:0});
+  const endL=e=>{if(e.pointerId!==TC.moveId)return;TC.moveId=null;TC.mx=TC.my=0;stL.hidden=true};zL.addEventListener('pointerup',endL);zL.addEventListener('pointercancel',endL);
+  const moveR=e=>{let dx=e.clientX-TC.rcx,dy=e.clientY-TC.rcy;const d=Math.hypot(dx,dy);if(d>R){dx*=R/d;dy*=R/d}knR.style.transform=`translate(${dx}px,${dy}px)`;if(d>14){TC.aimOn=true;TC.aimAng=Math.atan2(dy,dx)}else TC.aimOn=false};
+  zR.addEventListener('pointerdown',e=>{if(TC.aimId!==null)return;TC.aimId=e.pointerId;try{zR.setPointerCapture(e.pointerId)}catch(x){}TC.rcx=e.clientX;TC.rcy=e.clientY;TC.aimHeld=true;place(stR,knR,e);moveR(e);e.preventDefault()});
+  zR.addEventListener('pointermove',e=>{if(e.pointerId===TC.aimId)moveR(e)});
+  const endR=e=>{if(e.pointerId!==TC.aimId)return;TC.aimId=null;TC.aimOn=false;TC.aimHeld=false;stR.hidden=true};zR.addEventListener('pointerup',endR);zR.addEventListener('pointercancel',endR);
+  const dash=$('t-dash');dash.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();dash.classList.add('on');if(state==='play')dashPressed=true});
+  for(const ev of['pointerup','pointercancel','pointerleave'])dash.addEventListener(ev,()=>dash.classList.remove('on'));
+  for(const el of[$('touch'),cvs])el.addEventListener('contextmenu',e=>e.preventDefault());
+  if(IS_TOUCH)setTouchMode(true);
 })();
-function updTouch(){if(!IS_TOUCH)return;const show=state==='play',el=$('touch');if(el.hidden===show)el.hidden=!show;if(!show){TC.moveId=null;TC.aimId=null;TC.mx=TC.my=0;TC.aimOn=false;$('t-stickL').hidden=true}}
+// holding the aim thumb still: lock on to the nearest creature (or rival fish in PvP) in range
+function touchAutoAim(p){
+  const b=gunBase(p);let best=null,bd=isLaser(tier)?GUNS[tier].range*.9:Math.min(GUNS[tier].range||700,750);
+  for(const e of creatures){if(e.dead||e.z!==zone)continue;const d=Math.hypot(e.x-b.x,e.y-b.y);if(d<bd){bd=d;best=e}}
+  if(pvpOn())for(const r of liveRemotes()){const d=Math.hypot(r.x-b.x,r.y-b.y);if(d<bd){bd=d;best=r}}
+  return best?Math.atan2(best.y-b.y,best.x-b.x):null;
+}
+function updTouch(){const show=IS_TOUCH&&state==='play',el=$('touch');if(el.hidden===show)el.hidden=!show;if(!show){TC.moveId=null;TC.aimId=null;TC.mx=TC.my=0;TC.aimOn=false;TC.aimHeld=false;$('t-stickL').hidden=true;$('t-stickR').hidden=true}}
 
 // ===================================================================== input
 addEventListener('keydown',e=>{
