@@ -8,7 +8,7 @@ A side-view underwater shooter for one to six players. You're a very small fish 
 
 Every swim starts in **the Sunlit Zone**: jellyfish, crabs, sea turtles, swordfish, sharks, orcas and whales. Their parts build the handgun up to a rifle, a bazooka and the Huge Red Laser.
 
-Once you have the laser, hold it on the cracked rock near the seabed on the Sunlit Zone's east wall. After a few seconds it breaks, and a tunnel leads down into **the Twilight Zone**, which is twice as deep. Its creatures are deep jellyfish, bristlemouths, viperfish, swallowers, giant squid and sperm whales. Their parts unlock four more guns: the **Bubble Blaster**, the **Light Show**, the **Tooth Shooter** and the **Mega Beam**, a wider laser in your fish's own colour. The tunnel on the Twilight Zone's west wall leads back up.
+Once you have the laser, blast the cracked rock near the seabed on the Sunlit Zone's east wall with it, or with any stronger gun. After a few seconds it breaks (and stays open for everyone in the room), and a tunnel leads down into **the Twilight Zone**, which is twice as deep. Its creatures are deep jellyfish, bristlemouths, viperfish, swallowers, giant squid and sperm whales. Their parts unlock four more guns: the **Bubble Blaster**, the **Light Show**, the **Tooth Shooter** and the **Mega Beam**, a wider laser in your fish's own colour. The tunnel on the Twilight Zone's west wall leads back up.
 
 Every Twilight creature has more health than an orca. Twilight parts also buy **fish health** on the upgrade screen, in five steps from 100 up to 450. Each step heals you fully.
 

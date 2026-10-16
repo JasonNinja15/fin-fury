@@ -716,6 +716,19 @@ function laserSound(on){
   if(on&&!laserOsc){const o=AC.createOscillator(),o2=AC.createOscillator(),g=AC.createGain();const lo=tier===7?72:110;o.type='sawtooth';o.frequency.value=lo;o2.type='square';o2.frequency.value=lo*2.01;g.gain.value=.06;o.connect(g);o2.connect(g);g.connect(master);o.start();o2.start();laserOsc={o,o2,g}}
   else if(!on&&laserOsc){const l=laserOsc;laserOsc=null;try{l.g.gain.setTargetAtTime(0,AC.currentTime,.03);setTimeout(()=>{l.o.stop();l.o2.stop()},150)}catch(e){}}
 }
+// ---- other fish in the room: their shots and beams, fainter the further away they are
+let remoteOsc=null,lastRemoteSfx=0;
+function remoteLaserSound(vol,lo){
+  if(!AC||muted)vol=0;
+  if(vol>0&&!remoteOsc){const o=AC.createOscillator(),o2=AC.createOscillator(),g=AC.createGain();o.type='sawtooth';o2.type='square';o.frequency.value=lo;o2.frequency.value=lo*2.01;g.gain.value=0;o.connect(g);o2.connect(g);g.connect(master);o.start();o2.start();remoteOsc={o,o2,g}}
+  if(!remoteOsc)return;const t=AC.currentTime;
+  remoteOsc.g.gain.setTargetAtTime(.05*vol,t,.06);remoteOsc.o.frequency.setTargetAtTime(lo,t,.05);remoteOsc.o2.frequency.setTargetAtTime(lo*2.01,t,.05);
+  if(vol<=0){const l=remoteOsc;remoteOsc=null;setTimeout(()=>{try{l.o.stop();l.o2.stop()}catch(e){}},300)}
+}
+function remoteShotSfx(t,dist){
+  if(T-lastRemoteSfx<.045)return;const v=clamp(1-dist/1600,0,1)*.7;if(v<.05)return;lastRemoteSfx=T;const k=GUNS[t].kind;
+  if(k==='rocket')sfx.rocket(v);else if(k==='bubble')sfx.bubble(v);else if(k==='light')sfx.light(v*.99);else if(k==='teeth')gunshot(.5*v,.8,.09,100,.85);
+  else gunshot((t===0?.55:.42)*v,t===0?1:1.35,t===0?.11:.07,t===0?140:115,.85)}
 
 // ===================================================================== particles
 function part(o){if(parts.length<700)parts.push(o)}
@@ -960,8 +973,7 @@ function laserTick(dt){
     if(hit>=0){hurtCreature(e,g.dps*dt,'me');if(Math.random()<dt*25)sparks(lerp(b.x1,b.x2,hit),lerp(b.y1,b.y2,hit),2,spk)}}
   if(pvpOn())for(const r of liveRemotes()){const t=segCircle(b.x1,b.y1,b.x2,b.y2,r.x,r.y,FISH_R+w);if(t>=0){hurtRemote(r,g.dps*dt);if(Math.random()<dt*25)sparks(r.x,r.y,2,spk)}}
   // the cracked rock in the Sunlit Zone's east wall gives way to a laser held on it
-  if(zone===0&&!breachOpen()&&b.x2>WW-70&&inGap(b.y2,0)){breachHp-=g.dps*dt;shake=Math.max(shake,2);
-    if(Math.random()<dt*30)sparks(b.x2,b.y2,3,'#ffcf8a');if(Math.random()<dt*8)blobs(b.x2,b.y2,1,'#5e6470',6,4);if(breachHp<=0)doBreach()}
+  if(zone===0&&!breachOpen()&&b.x2>WW-70&&inGap(b.y2,0))hitBreach(g.dps*dt,b.x2,b.y2,dt);
   if(Math.random()<dt*20)bubbles(b.x2,b.y2,1,40);
 }
 // ---- the way down. A cracked stretch of the Sunlit Zone's east wall, near the seabed, breaks under a laser.
@@ -972,13 +984,15 @@ function openRange(z){if(z===0){const f=floorY(WW-40,0);return[f-560,f-140]}retu
 function inGap(y,z){const[o0,o1]=openRange(z);return y>o0&&y<o1}
 function breachOpen(){if(breached)return true;if(NET.active&&NET.started)for(const r of NET.remotes.values())if(r.br)return true;return false}
 function wallHit(x,y,z){if(x>WW-30)return!(z===0&&breachOpen()&&inGap(y,0));if(x<30)return!(z===1&&inGap(y,1));return false}
+// chip away at the cracked wall; beams pass dt so their sparks come at a steady rate
+function hitBreach(d,x,y,dt){breachHp-=d;shake=Math.max(shake,2);if(dt===undefined||Math.random()<dt*30)sparks(x,y,3,'#ffcf8a');if(dt===undefined||Math.random()<dt*8)blobs(x,y,1,'#5e6470',6,4);if(breachHp<=0)doBreach()}
 function doBreach(){
   breached=true;breachHp=0;const[o0,o1]=openRange(0),y=(o0+o1)/2;
   explosionFx(WW-30,y,220);for(let i=0;i<5;i++)explosionFx(WW-30+rand(-20,20),rand(o0,o1),120);blobs(WW-40,y,30,'#5e6470',140,12);bubbles(WW-40,y,40,120);
   shake=18;sfx.breach();toast('You blasted through the wall. The Twilight Zone lies beyond. Swim east.','#7fd8ff');
 }
-function breachHint(){if(breachHinted||zone!==0||breachOpen()||!isLaser(tier))return;breachHinted=true;
-  toast('The east wall is cracked near the seabed. Hold a laser on it to break through.','#7fd8ff')}
+function breachHint(){if(breachHinted||zone!==0||breachOpen()||tier<3)return;breachHinted=true;
+  toast('The east wall is cracked near the seabed. Blast it with the laser, or any stronger gun, to break through.','#7fd8ff')}
 function enterZone(z){
   zone=z;pl.z=z;proj=[];drops=[];parts=[];laserSound(false);
   const[o0,o1]=openRange(z),y=(o0+o1)/2;
@@ -1073,6 +1087,8 @@ function updProj(dt){
     if(b.k==='bubble'||b.st==='bubble'){const k=Math.exp(-1.5*dt);b.vx*=k;b.vy=b.vy*k-40*dt;b.ph+=dt*9;b.life-=dt;if(b.life<=0){bubbles(b.x,b.y,2,20);b.dead=true;continue}}
     b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.trav+=Math.hypot(b.vx,b.vy)*dt;
     const gone=b.y>floorY(b.x)||b.trav>b.range||b.y<ZT(zone)-300||wallHit(b.x,b.y,zone);
+    // every gun from the laser up can break the cracked wall, not just beams
+    if(gone&&b.own&&b.t>=3&&zone===0&&!breachOpen()&&b.x>WW-90&&inGap(b.y,0))hitBreach(b.dmg,b.x,b.y);
     if(b.k==='erocket'){
       if((pl&&pl.alive&&state!=="title"&&segCircle(b.px,b.py,b.x,b.y,pl.x,pl.y,45)>=0)||gone){explodeEnemy(b);b.dead=true}
       continue}
@@ -1321,7 +1337,7 @@ function drawOverlays(camx,camy,snowCol,dark){
   for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive&&r.z===zone){const px=(r.x-camx)*Z+VW/2,py=(r.y-camy)*Z+VH/2-34*Z-12;ctx.font='700 13px "Alegreya Sans",sans-serif';ctx.textAlign='center';ctx.lineWidth=4;ctx.strokeStyle=INK;ctx.strokeText(r.nk,px,py);ctx.fillStyle=COLORS[r.cl].c;ctx.fillText(r.nk,px,py);
     if(px<-10||px>VW+10||py<-10||py>VH+10)offscreenArrow(px,py,COLORS[r.cl].c)}
   // once you hold a laser, an arrow points the way to the cracked wall
-  if(pl&&pl.alive&&state!=='title'&&zone===0&&isLaser(tier)&&!breachOpen()){const[o0,o1]=openRange(0),px=(WW-40-camx)*Z+VW/2,py=((o0+o1)/2-camy)*Z+VH/2;
+  if(pl&&pl.alive&&state!=='title'&&zone===0&&tier>=3&&!breachOpen()){const[o0,o1]=openRange(0),px=(WW-40-camx)*Z+VW/2,py=((o0+o1)/2-camy)*Z+VH/2;
     if(px<-10||px>VW+10||py<-10||py>VH+10)offscreenArrow(px,py,'#7fd8ff')}
   ctx.fillStyle=snowCol;
   for(const s of DEC.snow){const x=((s.x*VW*1.2-camx*Z*s.z*.5+Math.sin(T*.3+s.ph)*20)%(VW*1.2)+VW*1.2)%(VW*1.2)-VW*.1,y=((s.y*VH*1.2-camy*Z*s.z*.5+T*8*s.z)%(VH*1.2)+VH*1.2)%(VH*1.2)-VH*.1;ctx.globalAlpha=.25+s.z*.45;ctx.beginPath();ctx.arc(x,y,s.z*1.8,0,TAU);ctx.fill()}
@@ -1555,15 +1571,20 @@ function encWorld(){
   if(!NET.started)return{st:0,md:NET.mode,df:diff,gg:gg?1:0,E:[],G:[],B:[]};
   const l=creatures.filter(e=>!e.dead&&!e.gone),P=[players(0),players(1)];l.sort((a,b)=>minDist(a.x,a.y,P[a.z])-minDist(b.x,b.y,P[b.z]));
   return{st:1,md:NET.mode,df:diff,gg:gg?1:0,E:l.slice(0,80).map(e=>[e.id,ORDER.indexOf(e.t),Math.round(e.x),Math.round(e.y),Math.round(e.vx),Math.round(e.vy),Math.ceil(e.hp),STS.indexOf(e.st),e.ac,e.tgt?1:0,e.face,e.gun,e.gun?r2(e.gaim):0,e.lz||0,e.z]),G:outList('G'),B:outList('B')}}
-function mkRemote(peer){return{id:peer,z:0,br:false,x:0,y:0,tx:0,ty:0,tvx:0,tvy:0,vx:0,vy:0,aim:0,face:1,tilt:0,tail:0,hp:100,tier:0,alive:false,laser:false,cl:0,nk:'Fish',k:0,init:false}}
+function mkRemote(peer){return{id:peer,z:0,br:false,x:0,y:0,tx:0,ty:0,tvx:0,tvy:0,vx:0,vy:0,aim:0,taim:0,aimV:0,aimT:0,face:1,tilt:0,tail:0,hp:100,tier:0,alive:false,laser:false,cl:0,nk:'Fish',k:0,init:false}}
 function applyPeer(peer,pr,r){
-  r.nk=String(pr.nk||'Fish').slice(0,14);r.cl=clamp(pr.cl|0,0,COLORS.length-1);r.k=pr.k|0;r.pk=pr.pk|0;r.h=!!pr.h;if(pr.br&&!r.br&&NET.started&&zone===0)toast(`${r.nk} blasted through the east wall. The Twilight Zone is open.`,'#7fd8ff');r.br=!!pr.br;
+  r.nk=String(pr.nk||'Fish').slice(0,14);r.cl=clamp(pr.cl|0,0,COLORS.length-1);r.k=pr.k|0;r.pk=pr.pk|0;r.h=!!pr.h;
+  // a broken wall stays broken for this page too, even after whoever broke it leaves the room
+  if(pr.br&&NET.started&&!breached){breached=true;breachHp=0;if(zone===0)toast(`${r.nk} blasted through the east wall. The Twilight Zone is open.`,'#7fd8ff')}
+  r.br=!!pr.br;
   const P=pr.P;
-  if(Array.isArray(P)){r.tx=+P[0]||0;r.ty=+P[1]||0;r.tvx=+P[2]||0;r.tvy=+P[3]||0;r.aim=(+P[4]||0)/100;r.hp=+P[5]||0;r.tier=clamp(P[6]|0,0,GUNS.length-1);r.z=clamp(P[9]|0,0,1);
+  if(Array.isArray(P)){r.tx=+P[0]||0;r.ty=+P[1]||0;r.tvx=+P[2]||0;r.tvy=+P[3]||0;r.hp=+P[5]||0;r.tier=clamp(P[6]|0,0,GUNS.length-1);r.z=clamp(P[9]|0,0,1);
+    // aim arrives in steps; remember how fast it is turning so animRemote can glide between updates
+    {const na=(+P[4]||0)/100,el=T-r.aimT;if(r.init&&el>0&&el<.5){const d=((na-r.taim+Math.PI)%TAU+TAU)%TAU-Math.PI;r.aimV=clamp(d/el,-10,10)}else{r.aimV=0;r.aim=na}r.taim=na;r.aimT=T}
     const al=!!P[7];if(!r.init||(al&&!r.alive)){r.x=r.tx;r.y=r.ty;r.init=true}r.alive=al;r.laser=!!P[8]&&isLaser(r.tier)}
   else r.alive=false;
   if(!NET.started)return;
-  for(const s of fresh(peer,'S',pr.S))if((s[5]|0)===zone&&Math.hypot(s[1]-cam.x,s[2]-cam.y)<2200)addShot(+s[1],+s[2],(+s[3]||0)/100,clamp(s[4]|0,0,GUNS.length-1),false);
+  for(const s of fresh(peer,'S',pr.S)){const d=Math.hypot(s[1]-cam.x,s[2]-cam.y);if((s[5]|0)===zone&&d<2200){const t=clamp(s[4]|0,0,GUNS.length-1);addShot(+s[1],+s[2],(+s[3]||0)/100,t,false);remoteShotSfx(t,d)}}
   if(pvpOn()){
     for(const d of fresh(peer,'D',pr.D))if(d[1]===NET.me&&pl&&pl.alive&&state!=='title')damagePlayer(clamp((+d[2]||0)/10,0,300),r,false,peer);
     for(const k of fresh(peer,'K',pr.K)){const killer=k[1];if(killer===NET.me){pvpKills++;toast(`You blasted ${r.nk}`,'#ffb43d');
@@ -1571,7 +1592,9 @@ function applyPeer(peer,pr,r){
   }
   if(NET.host)for(const h of fresh(peer,'H',pr.H)){const e=creatures.find(c=>c.id===h[1]);if(e&&!e.dead)hurtCreature(e,clamp((+h[2]||0)/10,0,600),peer)}
 }
-function animRemote(r,dt){if(!r.init)return;r.tx+=r.tvx*dt;r.ty+=r.tvy*dt;const k=Math.min(1,dt*10);r.x+=(r.tx-r.x)*k;r.y+=(r.ty-r.y)*k;r.vx=r.tvx;r.vy=r.tvy;
+function animRemote(r,dt){if(!r.init)return;r.tx+=r.tvx*dt;r.ty+=r.tvy*dt;const k=Math.min(1,dt*14);r.x+=(r.tx-r.x)*k;r.y+=(r.ty-r.y)*k;r.vx=r.tvx;r.vy=r.tvy;
+  // keep turning at the last known rate for a moment, then ease the drawn aim toward it (smooth beams)
+  if(T-r.aimT<.2)r.taim+=r.aimV*dt;r.aim=lerpAngle(r.aim,r.taim,Math.min(1,dt*20));
   const c=Math.cos(r.aim);if(c>.08)r.face=1;else if(c<-.08)r.face=-1;r.tilt+=(clamp(r.vy/900,-.22,.22)*r.face-r.tilt)*Math.min(1,dt*6);r.tail+=dt*(5+Math.hypot(r.vx,r.vy)*.04)}
 function applyWorld(peer,w){
   if(MODES[w.md])NET.mode=w.md;if(w.df!==undefined)setDiff(clamp(w.df|0,0,2),false);if(w.gg!==undefined)setGG(!!w.gg,false);
@@ -1599,8 +1622,13 @@ function netTick(dt){
     else if(NET.ready&&(NET.hostMiss+=dt)>6){endRoom('The host left, so the room closed.');return}}
   NET.dT-=dt;if(NET.dT<=0){NET.dT=.1;for(const[id,d]of NET.dacc)NET.out.D.push(mkSeq([id,Math.round(d*10)]));NET.dacc.clear()}
   if(!NET.host){NET.hT-=dt;if(NET.hT<=0){NET.hT=.1;for(const[id,d]of NET.hacc)NET.out.H.push(mkSeq([id,Math.round(d*10)]));NET.hacc.clear()}}
-  NET.sendT-=dt;
-  if(NET.sendT<=0){NET.sendT=.1;room.presence(fit(encMe(),['H','S','D'])).catch(()=>{});if(NET.host&&NET.world)NET.world.presence(fit(encWorld(),['G','B','E'])).catch(()=>{})}
+  // your own fish goes out 20 times a second (small); the host's world goes out 10 times a second (large)
+  NET.sendT-=dt;NET.wT=(NET.wT||0)-dt;
+  if(NET.sendT<=0){NET.sendT=.05;room.presence(fit(encMe(),['H','S','D'])).catch(()=>{})}
+  if(NET.host&&NET.world&&NET.wT<=0){NET.wT=.1;NET.world.presence(fit(encWorld(),['G','B','E'])).catch(()=>{})}
+  // hear the nearest other fish's beam, quieter with distance
+  let hv=0,hl=110;if(NET.started&&state!=='title')for(const r of NET.remotes.values())if(r.alive&&r.init&&r.laser&&r.z===zone){const v=clamp(1-Math.hypot(r.x-cam.x,r.y-cam.y)/1500,0,1);if(v>hv){hv=v;hl=r.tier===7?72:110}}
+  remoteLaserSound(hv*.8,hl);
 }
 function startMP(){
   NET.started=true;initAudio();if(AC&&AC.state==='suspended')AC.resume();
@@ -1630,7 +1658,7 @@ const roomLabel=()=>(NET.mode==='pvp'?MODES.pvp.n:`${MODES[NET.mode].n} · ${DIF
 function setGG(v,save){gg=!!v;if(save){selGG=gg;try{localStorage.setItem('finfury-gg',gg?'1':'0')}catch(e){}}const b=$('gg-toggle');if(b)b.setAttribute('aria-pressed',String(selGG))}
 async function leaveRooms(){const r=NET.room,w=NET.world;NET.room=null;NET.world=null;try{if(r)await r.leave()}catch(e){}try{if(w)await w.leave()}catch(e){}}
 function endRoom(msg){
-  leaveRooms();
+  leaveRooms();remoteLaserSound(0,110);
   Object.assign(NET,{active:false,started:false,ready:false,host:false,code:'',me:'',mode:'coop',remotes:new Map(),mirrors:new Map(),lastP:new Map(),lastW:null,lobbySig:'',hacc:new Map(),dacc:new Map()});
   setDiff(selDiff,false);setGG(selGG,false);
   if(state!=='title'){state='title';pl=null;zone=0;laserSound(false);creatures=[];proj=[];drops=[];seedCreatures(16)}
