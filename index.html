@@ -176,7 +176,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
           <div class="row" style="justify-content:space-between"><h3>Difficulty</h3>
             <div class="seg" id="diff-seg" role="group" aria-label="Difficulty"><button class="btn" type="button" data-diff="0">Normal</button><button class="btn" type="button" data-diff="1">Frenzy</button><button class="btn hot" type="button" data-diff="2">Insanity</button></div></div>
           <p id="diff-desc" class="small"></p>
-          <div class="ggrow"><button class="btn" id="gg-toggle" type="button" aria-pressed="false">Guns Galore</button><p class="small">Stacks on any difficulty or mode. Every creature spawns armed, whales carry lasers, and all bullets fly 3x faster.</p></div>
+          <div class="ggrow"><button class="btn" id="gg-toggle" type="button" aria-pressed="false">Guns Galore</button><p class="small">Stacks on any difficulty or mode. Every creature spawns armed, the biggest with the biggest guns, and all bullets fly 3x faster.</p></div>
         </div>
         <div class="row"><button class="btn big" id="play" type="button">Play</button><button class="btn" id="mp-open" type="button">Play together</button>
           <button class="btn" id="install" type="button" hidden>Install app</button><a class="btn" id="dl" href="index.html" download="fin-fury.html" hidden>Download file</a></div>
@@ -184,7 +184,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
           <kbd>WASD</kbd><span>Swim. Arrow keys work too</span>
           <kbd>Mouse</kbd><span>Aim. Hold left click to shoot</span>
           <kbd>Shift</kbd><span>Dash (Space works too). Nothing can hurt you mid-dash</span>
-          <kbd>Parts</kbd><span>Heal you: a stinger heals 5, each bigger creature's part 5 more, up to 35</span>
+          <kbd>Parts</kbd><span>Heal you. Parts from bigger creatures heal more</span>
           <kbd>E</kbd><span>Spend creature parts on gun upgrades</span>
           <kbd>Esc</kbd><span>Pause · <kbd>M</kbd> toggles sound</span>
         </div>
@@ -192,7 +192,7 @@ input[type=text]{background:#0d1c2d;border:2px solid var(--ink);border-radius:10
       <div class="stack">
         <h3>What swims here</h3>
         <ul id="beasts" class="beasts"></ul>
-        <p class="small">Weakest and most common at the top. Nothing attacks until you swim too close or shoot it. Only jellyfish, crabs and deep jellyfish are slower than you, and about one creature in ten carries a gun. Shooting a whale makes it angry.</p>
+        <p class="small">Creatures appear here once you have met them, weakest and most common first. Nothing attacks until you swim too close or shoot it, and some of them carry guns.</p>
       </div>
     </div>
   </div>
@@ -358,7 +358,7 @@ const SP={
     C:[[-45,0,9],[-20,0,12],[6,0,13],[30,1,12],[50,3,10]],L:{r:300,w:.45,s:820,t:.35,c:1},gm:[6,14,1.1],drop:[1,2],rar:'Common',col:'#3e5f82'},
   swallow:{name:'Swallower',part:'Swallower Gut',hp:2400,dmg:55,w:9,g:[1,2],spd:70,chase:340,turn:2.2,detect:360,fm:70,top:40,bw:110,tiltMax:.4,
     C:[[-48,0,9],[-24,0,12],[6,16,34],[38,4,14],[56,6,9]],L:{r:260,w:.6,s:700,t:.45,c:1.1},gm:[10,40,1.3],drop:[1,2],rar:'Uncommon',col:'#d8c3bb'},
-  squid:{name:'Giant Squid',part:'Squid Beak',hp:5000,dmg:80,w:4,g:[1,1],spd:90,chase:360,turn:1.8,detect:420,fm:90,top:50,bw:180,tiltMax:.35,
+  squid:{name:'Giant Squid',part:'Squid Beak',hp:5000,dmg:80,w:5,g:[1,1],spd:90,chase:360,turn:1.8,detect:420,fm:90,top:50,bw:180,tiltMax:.35,
     C:[[160,0,16],[120,0,28],[75,0,36],[30,0,30],[2,0,20],[-50,0,16],[-100,0,12]],L:{r:420,w:.6,s:760,t:.6,c:1.3},gm:[10,24,1.8],drop:[1,2],rar:'Rare',col:'#b0413e'},
   // the sperm whale enrages when shot, like the whale above it
   sperm:{name:'Sperm Whale',part:'Ambergris',hp:11000,dmg:150,w:1.4,g:[1,1],spd:55,chase:330,turn:1.5,detect:400,fm:140,top:90,bw:280,tiltMax:.2,lw:4,
@@ -377,7 +377,7 @@ const LUNGE_SPEED=1.5,LUNGE_TIME=.8,LUNGE_KB=650;
 // Difficulty: Normal is the base game. Frenzy raises big-hunter numbers, creature health and attack,
 // gun odds and gun fire rate by 30%; Insanity adds another 30% on top (1.3 x 1.3).
 const DIFFS=[{n:'Normal',d:'The ocean as it is.'},
-  {n:'Frenzy',d:'30% more big hunters (swordfish, sharks, orcas, whales and their Twilight Zone cousins). Creatures have 30% more health and hit 30% harder, and guns are 30% more common and fire 30% faster.'},
+  {n:'Frenzy',d:'30% more of the biggest hunters. Creatures have 30% more health and hit 30% harder, and guns are 30% more common and fire 30% faster.'},
   {n:'Insanity',d:'Another 30% on top of Frenzy for all of it: more big hunters, tougher, harder-hitting, and better armed.'}];
 const BIG=new Set(['sword','shark','orca','whale','viper','swallow','squid','sperm']);
 let diff=0,selDiff=0;try{selDiff=diff=clamp(parseInt(localStorage.getItem('finfury-diff')||'0',10)||0,0,2)}catch(e){}
@@ -1328,6 +1328,7 @@ function drawActors(x0,x1,y0,y1){
   for(const d of drops)if(d.x>x0-30&&d.x<x1+30&&d.y>y0-30&&d.y<y1+30){cx.save();cx.translate(d.x,d.y+Math.sin(d.a)*3);cx.rotate(Math.sin(d.a*.7)*.3);if(d.life<5)cx.globalAlpha=(Math.sin(d.life*12)+1)/2*.7+.3;
     cx.save();cx.globalCompositeOperation='lighter';circ(0,0,16+Math.sin(d.a*2)*2);cx.fillStyle='rgba(255,220,140,.14)';cx.fill();cx.restore();drawPart(d.t);cx.restore()}
   const vis=creatures.filter(e=>!e.gone&&e.z===zone&&e.x>x0-320&&e.x<x1+320&&e.y>y0-260&&e.y<y1+260).sort((a,b)=>ORDER.indexOf(b.t)-ORDER.indexOf(a.t));
+  if(state!=='title')for(const e of vis)if(!e.dead&&e.x>x0&&e.x<x1&&e.y>y0&&e.y<y1)markSeen(e.t);
   for(const e of vis)drawCreature(e);
   for(const r of NET.remotes.values())if(NET.started&&r.init&&r.alive&&r.z===zone){const c=COLORS[r.cl].c;if(r.laser)drawBeam(laserBeam(r,r.tier),.8,r.tier===7?c:'#e01f1f',r.tier===7?2.4:1);drawFish(r,c,r.tier)}
   if(pl&&pl.alive&&state!=='title'){const c=COLORS[selColor].c;if(pl.laser)drawBeam(laserBeam(pl,tier),1,tier===7?c:'#e01f1f',tier===7?2.4:1);if(!(pl.inv>0&&Math.floor(T*20)%2))drawFish(pl,c,tier)}
@@ -1504,7 +1505,15 @@ function drawParts(){
 }
 
 // ===================================================================== title screen bits
-const beastSpans={};
+const beastSpans={},beastRows={},beastHeads=[];
+// the title list only shows creatures you have actually seen on screen (remembered on this device)
+const seenSp=new Set();try{for(const t of JSON.parse(localStorage.getItem('finfury-seen')||'[]'))if(SP[t])seenSp.add(t)}catch(e){}
+let bestiaryDirty=true;
+function markSeen(t){if(seenSp.has(t))return;seenSp.add(t);bestiaryDirty=true;try{localStorage.setItem('finfury-seen',JSON.stringify([...seenSp]))}catch(e){}}
+function updBestiary(){bestiaryDirty=false;
+  for(const t of ORDER)beastRows[t].hidden=!seenSp.has(t);
+  beastHeads.forEach((h,z)=>h.hidden=!ZSP[z].some(t=>seenSp.has(t)));
+  $('beasts-none').hidden=seenSp.size>0}
 // bestiary stats follow the chosen difficulty
 function updBeasts(){const m=Math.pow(1.3,selDiff);for(const t in beastSpans){const s=SP[t];
   beastSpans[t].textContent=`${Math.round(s.hp*m)} health · bites for ${Math.round(s.dmg*m)} · ${s.g[0]===s.g[1]?'alone':`groups of ${s.g[0]}–${s.g[1]}`} · drops ${PLURAL[t].toLowerCase()}`}}
@@ -1514,10 +1523,11 @@ function buildTitle(){
     b.addEventListener('click',()=>{selColor=i;try{localStorage.setItem('finfury-color',i)}catch(e){}for(const o of sw.children)o.setAttribute('aria-pressed',String(o===b));$('color-name').textContent=c.n});sw.append(b)});
   $('color-name').textContent=COLORS[selColor].n;
   const ul=$('beasts');
+  const none=document.createElement('li');none.className='zonehead';none.id='beasts-none';none.textContent='Nothing yet. Dive in and see what is out there.';ul.append(none);
   for(const t of ORDER){
     if(SP[t].rank===0){const h=document.createElement('li'),hb=document.createElement('b'),hs=document.createElement('span');h.className='zonehead';
-      hb.textContent=ZONES[SP[t].z].name;hs.textContent=SP[t].z?'Past the cracked east wall of the Sunlit Zone. Bring a laser.':'Where every swim starts.';h.append(hb,hs);ul.append(h)}
-    const s=SP[t],li=document.createElement('li'),cv=document.createElement('canvas');cv.width=192;cv.height=104;
+      hb.textContent=ZONES[SP[t].z].name;hs.textContent=SP[t].z?'Past the cracked east wall of the Sunlit Zone.':'Where every swim starts.';h.append(hb,hs);ul.append(h);beastHeads[SP[t].z]=h}
+    const s=SP[t],li=document.createElement('li'),cv=document.createElement('canvas');cv.width=192;cv.height=104;beastRows[t]=li;
     const k=cv.getContext('2d'),[pw,ph,ox,oy]=PORT[t],sc=Math.min(176/pw,92/ph),o=cx;cx=k;k.translate(96-ox*sc,52-oy*sc);k.scale(sc,sc);k.lineJoin='round';k.lineCap='round';k.lineWidth=3.2;k.strokeStyle=INK;
     const fake={anim:1,ph:0,vx:0,vy:0,st:'wander',face:1};DRAW[t](fake,false);cx=o;
     const d=document.createElement('div'),b=document.createElement('b'),tag=document.createElement('span'),sp=document.createElement('span');
@@ -1582,8 +1592,8 @@ function applyPeer(peer,pr,r){
   r.br=!!pr.br;
   const P=pr.P;
   if(Array.isArray(P)){r.tx=+P[0]||0;r.ty=+P[1]||0;r.tvx=+P[2]||0;r.tvy=+P[3]||0;r.hp=+P[5]||0;r.tier=clamp(P[6]|0,0,GUNS.length-1);r.z=clamp(P[9]|0,0,1);
-    // aim arrives in steps; remember how fast it is turning so animRemote can glide between updates
-    {const na=(+P[4]||0)/100,el=T-r.aimT;if(r.init&&el>0&&el<.5){const d=((na-r.taim+Math.PI)%TAU+TAU)%TAU-Math.PI;r.aimV=clamp(d/el,-10,10)}else{r.aimV=0;r.aim=na}r.taim=na;r.aimT=T}
+    // aim arrives in steps; animRemote eases the drawn aim toward the latest one
+    {const na=(+P[4]||0)/100;if(!r.init)r.aim=na;r.taim=na}
     const al=!!P[7];if(!r.init||(al&&!r.alive)){r.x=r.tx;r.y=r.ty;r.init=true}r.alive=al;r.laser=!!P[8]&&isLaser(r.tier)}
   else r.alive=false;
   if(!NET.started)return;
@@ -1596,8 +1606,8 @@ function applyPeer(peer,pr,r){
   if(NET.host)for(const h of fresh(peer,'H',pr.H)){const e=creatures.find(c=>c.id===h[1]);if(e&&!e.dead)hurtCreature(e,clamp((+h[2]||0)/10,0,600),peer)}
 }
 function animRemote(r,dt){if(!r.init)return;r.tx+=r.tvx*dt;r.ty+=r.tvy*dt;const k=Math.min(1,dt*14);r.x+=(r.tx-r.x)*k;r.y+=(r.ty-r.y)*k;r.vx=r.tvx;r.vy=r.tvy;
-  // keep turning at the last known rate for a moment, then ease the drawn aim toward it (smooth beams)
-  if(T-r.aimT<.2)r.taim+=r.aimV*dt;r.aim=lerpAngle(r.aim,r.taim,Math.min(1,dt*20));
+  // ease the drawn aim toward the latest one: smooth beams, and no guessing ahead (guessing made guns wobble)
+  r.aim=lerpAngle(r.aim,r.taim,1-Math.exp(-dt*16));
   const c=Math.cos(r.aim);if(c>.08)r.face=1;else if(c<-.08)r.face=-1;r.tilt+=(clamp(r.vy/900,-.22,.22)*r.face-r.tilt)*Math.min(1,dt*6);r.tail+=dt*(5+Math.hypot(r.vx,r.vy)*.04)}
 function applyWorld(peer,w){
   if(MODES[w.md])NET.mode=w.md;if(w.df!==undefined)setDiff(clamp(w.df|0,0,2),false);if(w.gg!==undefined)setGG(!!w.gg,false);
@@ -1832,7 +1842,7 @@ function step(dt){
   const run=state==='title'||state==='play'||state==='dead'||NET.active;
   if(run)updWorld(dt);
   render();
-  if(state!=='title'){updHud();updRoomTag()}else if(!$('title').hidden)drawPreview();
+  if(state!=='title'){updHud();updRoomTag()}else if(!$('title').hidden){drawPreview();if(bestiaryDirty)updBestiary()}
   updTouch();if(NET.active)updateLobby();
 }
 function frame(now){const dt=Math.min(.033,(now-last)/1000);last=now;try{step(dt)}catch(err){console.error(err)}requestAnimationFrame(frame)}
