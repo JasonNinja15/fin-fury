@@ -6,7 +6,7 @@ A side-view underwater shooter for one to six players. You're a very small fish 
 
 ## Two zones
 
-Every swim starts in **the Sunlit Zone**: jellyfish, crabs, sea turtles, swordfish, sharks, orcas and whales. Their parts build the handgun up to a rifle, a bazooka and the Huge Red Laser.
+Every swim starts in **the Sunlit Zone**: jellyfish, crabs, sea turtles, swordfish, sharks, orcas and whales. Their parts build the handgun up to a rifle, a bazooka and the Huge Red Laser. Swim all the way up and you can leap out of the water; dash upward at the surface for a big jump.
 
 Once you have the laser, blast the cracked rock near the seabed on the Sunlit Zone's east wall with it, or with any stronger gun. After a few seconds it breaks (and stays open for everyone in the room), and a tunnel leads down into **the Twilight Zone**, which is twice as deep. Its creatures are deep jellyfish, bristlemouths, viperfish, swallowers, giant squid and sperm whales. Their parts unlock four more guns: the **Bubble Blaster**, the **Light Show**, the **Tooth Shooter** and the **Mega Beam**, a wider laser in your fish's own colour. The tunnel on the Twilight Zone's west wall leads back up.
 

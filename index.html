@@ -297,7 +297,7 @@ function rr(x,y,w,h,r){cx.beginPath();cx.roundRect(x,y,w,h,r)}
 // Two zones side by side. The Sunlit Zone (0) is where every run starts; the Twilight Zone (1) lies past
 // the Sunlit Zone's east wall and is twice as deep. `zone` is where this page's own fish is.
 const WW=9000;
-const ZONES=[{name:'The Sunlit Zone',sub:'0 to 200 metres · where the light reaches',top:170,fl:3600},
+const ZONES=[{name:'The Sunlit Zone',sub:'0 to 200 metres · where the light reaches',top:40,fl:3600},
   {name:'The Twilight Zone',sub:'200 to 1,000 metres · where sunlight fades out',top:300,fl:7200}];
 const ZT=z=>ZONES[z].top,ZF=z=>ZONES[z].fl;
 let zone=0;
@@ -358,11 +358,11 @@ const SP={
   // ---- the Twilight Zone: every creature has more health than an orca (540), and only the deep jellyfish is slower than you
   djelly:{name:'Deep Jellyfish',part:'Glow Bell',hp:700,dmg:22,w:40,g:[2,4],spd:25,chase:95,turn:1.3,detect:170,fm:60,top:44,bw:60,tiltMax:0,
     C:[[0,-8,25],[0,24,12]],gm:[0,26,1],drop:[1,1],rar:'Swarms',col:'#5a4fd0'},
-  bristle:{name:'Bristlemouth',part:'Glow Scale',hp:600,dmg:18,w:30,g:[3,6],spd:120,chase:330,turn:3,detect:260,fm:40,top:16,bw:36,tiltMax:.5,lw:2.4,
+  bristle:{name:'Bristlemouth',part:'Glow Scale',hp:600,dmg:18,w:22,g:[3,6],spd:120,chase:330,turn:3,detect:260,fm:40,top:16,bw:36,tiltMax:.5,lw:2.4,
     C:[[-10,0,7],[4,0,9],[15,1,6]],L:{r:140,w:.3,s:620,t:.3,c:.9},gm:[2,8,.7],drop:[1,1],rar:'Schools',col:'#8c96a8'},
   viper:{name:'Viperfish',part:'Viper Fang',hp:1400,dmg:40,w:16,g:[1,2],spd:100,chase:360,turn:2.6,detect:380,fm:50,top:46,bw:90,tiltMax:.45,
     C:[[-45,0,9],[-20,0,12],[6,0,13],[30,1,12],[50,3,10]],L:{r:300,w:.45,s:820,t:.35,c:1},gm:[6,14,1.1],drop:[1,2],rar:'Common',col:'#3e5f82'},
-  swallow:{name:'Swallower',part:'Swallower Gut',hp:2400,dmg:55,w:9,g:[1,2],spd:70,chase:340,turn:2.2,detect:360,fm:70,top:40,bw:110,tiltMax:.4,
+  swallow:{name:'Swallower',part:'Swallower Gut',hp:2400,dmg:55,w:12,g:[1,2],spd:70,chase:340,turn:2.2,detect:360,fm:70,top:40,bw:110,tiltMax:.4,
     C:[[-48,0,9],[-24,0,12],[6,16,34],[38,4,14],[56,6,9]],L:{r:260,w:.6,s:700,t:.45,c:1.1},gm:[10,40,1.3],drop:[1,2],rar:'Uncommon',col:'#d8c3bb'},
   squid:{name:'Giant Squid',part:'Squid Beak',hp:5000,dmg:80,w:5,g:[1,1],spd:90,chase:360,turn:1.8,detect:420,fm:90,top:50,bw:180,tiltMax:.35,
     C:[[160,0,16],[120,0,28],[75,0,36],[30,0,30],[2,0,20],[-50,0,16],[-100,0,12]],L:{r:420,w:.6,s:760,t:.6,c:1.3},gm:[10,24,1.8],drop:[1,2],rar:'Rare',col:'#b0413e'},
@@ -670,6 +670,10 @@ function emptyBag(){const b={};for(const t of ORDER)b[t]=0;return b}
 bag=emptyBag();killsBy=emptyBag();
 function newPlayer(x,y){x=x??WW/2+rand(-150,150);return{id:'me',z:zone,x,y:y??floorY(x)-360,vx:0,vy:0,aim:0,face:1,tilt:0,hp:maxHp(),max:maxHp(),inv:1,alive:true,cd:0,hurtT:9,tail:0,laser:false,dashT:0,dashCd:0}}
 const DASH_SPEED=860,DASH_TIME=.2,DASH_CD=.9;let dashPressed=false;
+// jumping out of the Sunlit Zone: gravity in the air, the boost for breaking the surface, and the fastest launch
+const AIR_G=1100,AIR_BOOST=1.6,AIR_MAXV=1150;
+function splash(x,v){const n=Math.min(22,6+v/40);for(let i=0;i<n;i++)part({k:'drop',x:x+rand(-14,14),y:-2,vx:rand(-160,160),vy:-rand(100,200+v*.35),r:rand(2,4.5),life:rand(.5,1),max:1});
+  bubbles(x,14,Math.round(n/2),60);if(state!=='title')sfx.splash(Math.min(1,v/700))}
 
 // ===================================================================== audio
 let AC=null,master=null,laserOsc=null;
@@ -717,6 +721,7 @@ const sfx={
   kill(big){tone(big?140:320,.35,'triangle',.25,big?60:120);noise(.25,.2,900)},
   hurt(){tone(220,.25,'sawtooth',.22,90);noise(.2,.25,600)},
   pick(){tone(880,.08,'sine',.15,1320)},
+  splash(v=1){sweep(.35,.25*v+.05,2600,500);noise(.18,.15*v+.04,1800)},
   dash(){noise(.22,.22,1100);tone(260,.18,'sine',.12,620)},
   up(){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,.25,'triangle',.2),i*90))},
 };
@@ -911,7 +916,9 @@ function killFx(e){
 function spawnDrops(t,x,y){const[a,b]=SP[t].drop;const n=ri(a,b);for(let i=0;i<n;i++)drops.push({t,x:x+rand(-14,14),y:y+rand(-10,10),vx:rand(-60,60),vy:rand(-90,-30),life:60,a:rand(0,TAU)})}
 
 // ---- spawning (host / single player only)
-const spawnW=t=>SP[t].w*(BIG.has(t)?DM():1);
+// swordfish, sharks and orcas ease in over the first 90 seconds of a swim (a quarter as common at the start)
+const EARLY=new Set(['sword','shark','orca']),EARLY_T=90;
+const spawnW=t=>SP[t].w*(BIG.has(t)?DM():1)*(EARLY.has(t)&&state!=='title'?.25+.75*clamp(runTime/EARLY_T,0,1):1);
 function pickSpecies(z){const l=ZSP[z];let tot=0;for(const t of l)tot+=spawnW(t);let r=Math.random()*tot;for(const t of l){r-=spawnW(t);if(r<=0)return t}return l[0]}
 // the depth range each species keeps to
 function band(t,x,z){const f=floorY(x,z),top=ZT(z);switch(t){
@@ -973,7 +980,7 @@ function addShot(x,y,a,t,own,ivx=0,ivy=0){
   if(g.kind!=='rocket')part({k:'flash',x,y,r:9,life:.06,max:.06});
 }
 function laserBeam(p,t){const z=p.z|0,m=muzzle(p,t),L=GUNS[t].range,dx=Math.cos(p.aim),dy=Math.sin(p.aim);let len=L;
-  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x,z)+4||y<ZT(z)-200||wallHit(x,y,z)){len=s;break}}
+  for(let s=24;s<=L;s+=24){const x=m.x+dx*s,y=m.y+dy*s;if(y>floorY(x,z)+4||y<(z?ZT(z)-200:-1500)||wallHit(x,y,z)){len=s;break}}
   return{x1:m.x,y1:m.y,x2:m.x+dx*len,y2:m.y+dy*len}}
 function segCircle(x1,y1,x2,y2,cx_,cy_,r){const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy;let t=l2?((cx_-x1)*dx+(cy_-y1)*dy)/l2:0;t=clamp(t,0,1);const px=x1+dx*t,py=y1+dy*t;return(px-cx_)**2+(py-cy_)**2<=r*r?t:-1}
 function laserTick(dt){
@@ -1033,13 +1040,23 @@ function updPlayer(dt,input){
   if(dashPressed&&input&&p.dashCd<=0){let dx=ix,dy=iy;if(Math.hypot(dx,dy)<.2){dx=Math.cos(p.aim);dy=Math.sin(p.aim)}const l=Math.hypot(dx,dy)||1;
     p.vx=dx/l*DASH_SPEED;p.vy=dy/l*DASH_SPEED;p.dashT=DASH_TIME;p.dashCd=DASH_CD;bubbles(p.x,p.y,10,90);sfx.dash()}
   dashPressed=false;
-  const AC_=1500,MAX=285;p.vx+=ix*AC_*dt;p.vy+=iy*AC_*dt;
-  const sp=Math.hypot(p.vx,p.vy);
-  // above swimming speed (after a dash or a big hit) bleed off quickly instead of snapping back
-  if(sp>MAX&&p.dashT<=0){const k=Math.max(MAX/sp,Math.exp(-5*dt));p.vx*=k;p.vy*=k}
-  if(p.dashT>0){if(Math.random()<dt*60)part({k:"ghost",x:p.x,y:p.y,face:p.face,tilt:p.tilt,aim:p.aim,tail:p.tail,life:.22,max:.22})}
-  else{const drag=Math.exp(-(Math.hypot(ix,iy)>.1?1.2:2.8)*dt);p.vx*=drag;p.vy*=drag}
+  // above the Sunlit Zone's surface (y < 0) the fish is out of the water: gravity takes over, with a little air steering
+  const air=zone===0&&p.y<0;
+  if(air){p.vy+=AIR_G*dt;p.vx+=ix*260*dt;p.vx*=Math.exp(-.4*dt)}
+  else{
+    const AC_=1500,MAX=285;p.vx+=ix*AC_*dt;p.vy+=iy*AC_*dt;
+    const sp=Math.hypot(p.vx,p.vy);
+    // above swimming speed (after a dash or a big hit) bleed off quickly instead of snapping back
+    if(sp>MAX&&p.dashT<=0){const k=Math.max(MAX/sp,Math.exp(-5*dt));p.vx*=k;p.vy*=k}
+    if(p.dashT<=0){const drag=Math.exp(-(Math.hypot(ix,iy)>.1?1.2:2.8)*dt);p.vx*=drag;p.vy*=drag}
+  }
+  if(p.dashT>0&&Math.random()<dt*60)part({k:"ghost",x:p.x,y:p.y,face:p.face,tilt:p.tilt,aim:p.aim,tail:p.tail,life:.22,max:.22});
   p.x+=p.vx*dt;p.y+=p.vy*dt;
+  // breaking the surface: leaving the water at speed launches the fish (dash upward for a big leap); coming back down splashes
+  if(zone===0){
+    if(!p.inAir&&p.y<0){p.inAir=true;if(p.vy<0)p.vy=Math.max(-AIR_MAXV,p.vy*AIR_BOOST);splash(p.x,Math.abs(p.vy))}
+    else if(p.inAir&&p.y>=0){p.inAir=false;splash(p.x,Math.abs(p.vy));p.vy*=.45}
+  }else p.inAir=false;
   // the side walls, with a tunnel where the wall is open; inside a tunnel the fish stays between its roof and floor
   const tun=zone===0?p.x>WW-60:p.x<60;
   if(zone===0){const right=breachOpen()&&inGap(p.y,0)?WW+200:WW-60;if(p.x<60){p.x=60;p.vx=0}if(p.x>right){p.x=right;p.vx=0}}
@@ -1047,12 +1064,13 @@ function updPlayer(dt,input){
   if(tun){const[o0,o1]=openRange(zone);if(p.y<o0+18){p.y=o0+18;p.vy=Math.max(0,p.vy)}if(p.y>o1-18){p.y=o1-18;p.vy=Math.min(0,p.vy)}}
   if(zone===0&&p.x>WW+90){enterZone(1);return}
   if(zone===1&&p.x<-90){enterZone(0);return}
-  if(p.y<ZT(zone)){p.y=ZT(zone);p.vy=Math.max(0,p.vy);if(Math.random()<dt*3)toast(zone?'The light above is too far to follow. The tunnel back to the Sunlit Zone is on the west wall.':'The surface is too far up. Your fish turns back.','#9fb9c6',true)}
+  if(zone===1&&p.y<ZT(1)){p.y=ZT(1);p.vy=Math.max(0,p.vy);if(Math.random()<dt*3)toast('The light above is too far to follow. The tunnel back to the Sunlit Zone is on the west wall.','#9fb9c6',true)}
   const fl=floorY(p.x)-16;if(p.y>fl){p.y=fl;p.vy=Math.min(0,p.vy)}
   const c=Math.cos(p.aim);if(c>.08)p.face=1;else if(c<-.08)p.face=-1;
-  p.tilt+=(clamp(p.vy/900,-.22,.22)*p.face-p.tilt)*Math.min(1,dt*6);
-  p.tail+=dt*(5+Math.hypot(p.vx,p.vy)*.04);
-  if(Math.random()<dt*(1.2+Math.hypot(p.vx,p.vy)/120))bubbles(p.x-p.face*24,p.y,1,25);
+  // in the air the fish tips nose-up on the way out and nose-down on the way back in
+  const tl=air?.6:.22;p.tilt+=(clamp(p.vy/(air?700:900),-tl,tl)*p.face-p.tilt)*Math.min(1,dt*6);
+  p.tail+=dt*(air?14:5+Math.hypot(p.vx,p.vy)*.04);
+  if(!air&&Math.random()<dt*(1.2+Math.hypot(p.vx,p.vy)/120))bubbles(p.x-p.face*24,p.y,1,25);
   if(p.inv>0)p.inv-=dt;p.hurtT+=dt;
   // slow regeneration only in pure PvP (no creatures, no parts); everywhere else parts are how you heal
   if(NET.active&&NET.mode==='pvp'&&p.hurtT>5&&p.hp<p.max)p.hp=Math.min(p.max,p.hp+6*dt);
@@ -1096,7 +1114,7 @@ function updProj(dt){
     // bubbles slow down, wobble and pop on their own
     if(b.k==='bubble'||b.st==='bubble'){const k=Math.exp(-1.5*dt);b.vx*=k;b.vy=b.vy*k-40*dt;b.ph+=dt*9;b.life-=dt;if(b.life<=0){bubbles(b.x,b.y,2,20);b.dead=true;continue}}
     b.px=b.x;b.py=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.trav+=Math.hypot(b.vx,b.vy)*dt;
-    const gone=b.y>floorY(b.x)||b.trav>b.range||b.y<ZT(zone)-300||wallHit(b.x,b.y,zone);
+    const gone=b.y>floorY(b.x)||b.trav>b.range||b.y<(zone?ZT(zone)-300:-1600)||wallHit(b.x,b.y,zone);
     // every gun from the laser up can break the cracked wall, not just beams
     if(gone&&b.own&&b.t>=3&&zone===0&&!breachOpen()&&b.x>WW-90&&inGap(b.y,0))hitBreach(b.dmg,b.x,b.y);
     if(b.k==='erocket'){
@@ -1160,7 +1178,7 @@ const seenPart={};let nudgeT=-99;
 function upgradeNudge(msg){if(T-nudgeT<20)return;nudgeT=T;toast(msg,'#ffb43d')}
 function updParts(dt){
   for(const p of parts){p.life-=dt;if(p.vx!==undefined){p.x+=p.vx*dt;p.y+=p.vy*dt}
-    if(p.k==='bub'){p.vy-=30*dt;p.vx*=.98}else if(p.k==='blob'||p.k==='puff'){p.vx*=Math.exp(-3*dt);p.vy*=Math.exp(-3*dt)}}
+    if(p.k==='bub'){p.vy-=30*dt;p.vx*=.98;if(zone===0&&p.y<0)p.life=0}else if(p.k==='blob'||p.k==='puff'){p.vx*=Math.exp(-3*dt);p.vy*=Math.exp(-3*dt)}else if(p.k==='drop'){p.vy+=900*dt;if(p.y>0&&p.vy>0)p.life=0}}
   parts=parts.filter(p=>p.life>0);
 }
 
@@ -1290,14 +1308,16 @@ function render(){
   const gr=ctx.createLinearGradient(0,0,0,VH);gr.addColorStop(0,rgb(depthRGB(Math.max(0,y0))));gr.addColorStop(1,rgb(depthRGB(Math.max(0,y1))));ctx.fillStyle=gr;ctx.fillRect(0,0,VW,VH);
   if(zone===1){renderTwilight(camx,camy,x0,x1,y0,y1);return}
   // sky and surface, visible only near the top of the world
-  if(y0<40){const sY=(0-camy)*Z+VH/2;if(sY>0){const sk=ctx.createLinearGradient(0,0,0,sY);sk.addColorStop(0,'#bfe6f2');sk.addColorStop(1,'#e9f7f6');ctx.fillStyle=sk;ctx.fillRect(0,0,VW,sY)}
+  if(y0<40){const sY=(0-camy)*Z+VH/2;if(sY>0){const sk=ctx.createLinearGradient(0,0,0,sY);sk.addColorStop(0,'#bfe6f2');sk.addColorStop(1,'#e9f7f6');ctx.fillStyle=sk;ctx.fillRect(0,0,VW,sY);drawSky(camx,camy,sY)}
     ctx.beginPath();ctx.moveTo(0,sY);for(let x=0;x<=VW+20;x+=20){const wx=camx+(x-VW/2)/Z;ctx.lineTo(x,sY+Math.sin(wx*.02+T*2)*4*Z+Math.sin(wx*.007-T)*3*Z)}
     ctx.lineTo(VW,sY+30*Z);ctx.lineTo(0,sY+30*Z);ctx.closePath();ctx.fillStyle='rgba(190,240,250,.55)';ctx.fill();ctx.lineWidth=3*Z;ctx.strokeStyle='rgba(255,255,255,.8)';ctx.stroke()}
   // light shafts fade with depth
   const la=clamp(1-camy/2600,0,1)*.11+.015;ctx.save();ctx.globalCompositeOperation='lighter';
+  // shafts start at the waterline, never in the sky
+  const wy=Math.max(0,(0-camy)*Z+VH/2);
   for(let i=0;i<7;i++){const bx=((i*397-camx*.15*Z)%(VW+600)+VW+600)%(VW+600)-300,sw=Math.sin(T*.4+i)*40;
-    const lg=ctx.createLinearGradient(0,0,0,VH);lg.addColorStop(0,`rgba(200,240,255,${la})`);lg.addColorStop(1,'rgba(200,240,255,0)');ctx.fillStyle=lg;
-    ctx.beginPath();ctx.moveTo(bx,0);ctx.lineTo(bx+60+i%3*30,0);ctx.lineTo(bx+220+sw,VH);ctx.lineTo(bx+90+sw,VH);ctx.closePath();ctx.fill()}
+    const lg=ctx.createLinearGradient(0,wy,0,VH);lg.addColorStop(0,`rgba(200,240,255,${la})`);lg.addColorStop(1,'rgba(200,240,255,0)');ctx.fillStyle=lg;
+    ctx.beginPath();ctx.moveTo(bx,wy);ctx.lineTo(bx+60+i%3*30,wy);ctx.lineTo(bx+220+sw,VH);ctx.lineTo(bx+90+sw,VH);ctx.closePath();ctx.fill()}
   ctx.restore();
   // far and mid parallax silhouettes
   drawParallax(DEC.far,.35,camx,camy,rgb(depthRGB(camy+500),1),.55,false);
@@ -1360,6 +1380,13 @@ function drawOverlays(camx,camy,snowCol,dark){
     ctx.font=`800 ${Math.round(clamp(VW/20,26,46))}px Cinzel, Georgia, serif`;ctx.lineWidth=6;ctx.strokeStyle=INK;ctx.strokeText(Zn.name,VW/2,VH*.24);ctx.fillStyle=zone?'#9fd8ff':'#ffd88a';ctx.fillText(Zn.name,VW/2,VH*.24);
     ctx.font='600 15px "Alegreya Sans",sans-serif';ctx.lineWidth=4;ctx.strokeText(Zn.sub,VW/2,VH*.24+30);ctx.fillStyle='#e9f2ef';ctx.fillText(Zn.sub,VW/2,VH*.24+30);ctx.restore()}
 }
+// above the Sunlit Zone: a hazy sun and slow clouds, drawn behind the waves
+function drawSky(camx,camy,sY){
+  ctx.save();const sx=VW*.78-camx*Z*.02,sy=sY-(700+camy*.1)*Z;const g=ctx.createRadialGradient(sx,sy,0,sx,sy,160*Z);g.addColorStop(0,'rgba(255,250,215,.95)');g.addColorStop(.25,'rgba(255,240,180,.55)');g.addColorStop(1,'rgba(255,240,180,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,VW,sY);
+  for(let i=0;i<6;i++){const w=(180+i*37%90)*Z,x=((i*613+T*6-camx*.25)*Z%(VW+w*2)+VW+w*2)%(VW+w*2)-w,y=sY-(260+i*140%420)*Z-camy*.05*Z;if(y>sY)continue;
+    ctx.fillStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.ellipse(x,y,w*.5,w*.16,0,0,TAU);ctx.ellipse(x-w*.22,y+w*.03,w*.28,w*.14,0,0,TAU);ctx.ellipse(x+w*.2,y-w*.05,w*.26,w*.18,0,0,TAU);ctx.fill()}
+  ctx.restore()}
 function offscreenArrow(px,py,col){const x=clamp(px,24,VW-24),y=clamp(py,24,VH-24),a=Math.atan2(py-VH/2,px-VW/2);ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.beginPath();ctx.moveTo(10,0);ctx.lineTo(-8,-8);ctx.lineTo(-8,8);ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.lineWidth=3;ctx.strokeStyle=INK;ctx.stroke();ctx.restore()}
 function drawParallax(list,f,camx,camy,col,alpha,kelpy){
   ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle=col;const base=(ZF(zone)+80-camy)*Z*f+VH/2;
@@ -1503,6 +1530,7 @@ function drawParts(){
       case'bub':cx.globalAlpha=Math.min(1,k*2)*.75;circ(p.x,p.y,p.r);cx.lineWidth=1.4;cx.strokeStyle='#dff6ff';cx.stroke();cx.globalAlpha=1;break;
       case'spark':cx.beginPath();cx.moveTo(p.x,p.y);cx.lineTo(p.x-p.vx*.035,p.y-p.vy*.035);cx.lineWidth=2.6;cx.strokeStyle=p.c;cx.globalAlpha=k;cx.stroke();cx.globalAlpha=1;break;
       case'blob':circ(p.x,p.y,p.r*k);cx.fillStyle=p.c;cx.fill();cx.lineWidth=2;cx.strokeStyle=INK;cx.stroke();break;
+      case'drop':circ(p.x,p.y,p.r);cx.fillStyle='#cdeffa';cx.fill();cx.lineWidth=1.6;cx.strokeStyle=INK;cx.stroke();break;
       case'puff':cx.globalAlpha=k*.7;circ(p.x,p.y,p.r*(1.7-k*.7));cx.fillStyle=p.c;cx.fill();cx.globalAlpha=1;break;
       case'ring':circ(p.x,p.y,p.r*(1-k*k));cx.lineWidth=7*k+1;cx.strokeStyle=INK;cx.stroke();cx.lineWidth=4*k;cx.strokeStyle='#ffd27a';cx.stroke();break;
       case'txt':cx.save();cx.globalAlpha=Math.min(1,k*1.6);cx.font='800 16px "Alegreya Sans",sans-serif';cx.textAlign='center';cx.lineWidth=4;cx.strokeStyle=INK;cx.strokeText(p.s,p.x,p.y);cx.fillStyle='#7dff9a';cx.fillText(p.s,p.x,p.y);cx.restore();break;
@@ -1569,7 +1597,7 @@ function updWorld(dt){
   else{cam.x=WW/2+Math.sin(T*.03)*2600;cam.y=ZF(0)-560+Math.sin(T*.07)*120}
   // the camera may look a little way into a tunnel; the Sunlit Zone shows the sky above, the Twilight Zone only darkness
   const hw=VW/2/Z,hh=VH/2/Z,xl=zone===1?hw-300:hw-60,xr=zone===0&&breachOpen()?WW-hw+300:WW-hw+60;
-  cam.x=clamp(cam.x,xl,xr);cam.y=clamp(cam.y,zone?ZT(1)-120+hh*.5:-60+hh*.3,ZF(zone)+170-hh);
+  cam.x=clamp(cam.x,xl,xr);cam.y=clamp(cam.y,zone?ZT(1)-120+hh*.5:-760+hh*.3,ZF(zone)+170-hh);
   if(zoneBanner>0)zoneBanner-=dt;
 }
 
